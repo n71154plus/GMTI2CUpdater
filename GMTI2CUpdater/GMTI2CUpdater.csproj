@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <Nullable>enable</Nullable>
+	<LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+	<PackageReference Include="Costura.Fody" Version="6.0.0" PrivateAssets="all" />
+	<PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
+	<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+	<PackageReference Include="MoonSharp" Version="2.0.0" />
+	<PackageReference Include="NCalcSync" Version="5.7.0" />
+	<PackageReference Include="HidSharp" Version="2.6.4" />
+  </ItemGroup>
+</Project>
