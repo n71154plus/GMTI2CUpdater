@@ -27,6 +27,7 @@
                     <TextBlock Grid.Column="0"
                                Text="Addr"
                                FontFamily="Consolas"
+                               FontSize="12"
                                Foreground="#FF5EC7FF"
                                Margin="0,0,4,0"/>
 
@@ -40,11 +41,12 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Width="26"
+                                <Border Width="21"
                                         Padding="1,0"
-                                        Margin="0,0,2,0">
+                                        Margin="0,0,0,0">
                                     <TextBlock Text="{Binding}"
                                                FontFamily="Consolas"
+                                               FontSize="12"
                                                Foreground="#FFAAAAAA"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"/>
@@ -72,6 +74,7 @@
                                 <TextBlock Grid.Column="0"
                                            Text="{Binding AddressText}"
                                            FontFamily="Consolas"
+                                           FontSize="12"
                                            Foreground="#FF5EC7FF"
                                            Margin="0,0,4,0"/>
 
@@ -85,9 +88,9 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type local:HexByteViewModel}">
-                                            <Border Width="26"
+                                            <Border Width="21"
                                                     Padding="1,0"
-                                                    Margin="0,0,2,0">
+                                                    Margin="0,0,0,0">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="Transparent"/>
@@ -103,6 +106,7 @@
                                                 </Border.Style>
                                                 <TextBlock Text="{Binding DisplayText}"
                                                    FontFamily="Consolas"
+                                                   FontSize="12"
                                                    Foreground="White"
                                                    HorizontalAlignment="Center"
                                                    TextAlignment="Center"/>

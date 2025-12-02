@@ -4,13 +4,15 @@ using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GMTI2CUpdater.I2CAdapter;
+using System.Windows;
 
 namespace GMTI2CUpdater
 {
     public partial class MainWindowViewModel : ObservableObject
     {
         // ====== 這些會自動產生 public 屬性 ======
-        [ObservableProperty] private string selectedBus;
+        [ObservableProperty] private I2CAdapterInfo selectedAdapter;
         [ObservableProperty] private string deviceAddress;
         [ObservableProperty] private string pageSize;
         [ObservableProperty] private string totalSize;
@@ -23,6 +25,10 @@ namespace GMTI2CUpdater
         [ObservableProperty] private byte[] beforeData;
         [ObservableProperty] private byte[] targetData;
         [ObservableProperty] private byte[] afterData;
+
+        [ObservableProperty] private string beforeChecksum;
+        [ObservableProperty] private string targetChecksum;
+        [ObservableProperty] private string afterChecksum;
 
         [ObservableProperty] private string beforeRangeText;
         [ObservableProperty] private string targetRangeText;
@@ -40,13 +46,15 @@ namespace GMTI2CUpdater
         [ObservableProperty] private string statusMessage;
         [ObservableProperty] private double progress;
 
+        [ObservableProperty] private List<I2CAdapterInfo> adapterInfos;
+
         // Log 集合本身用 ObservableCollection 即可
         public ObservableCollection<string> LogItems { get; } = new();
 
         public MainWindowViewModel()
         {
             // 初始一般設定
-            SelectedBus = "I2C-1";
+            //SelectedBus = "I2C-1";
             DeviceAddress = "0x50";
             PageSize = "16";
             TotalSize = "256";
@@ -65,6 +73,9 @@ namespace GMTI2CUpdater
             Progress = 0;
 
             InitDemoDataCore();
+            AdapterInfos = I2CAdapterManger.GetAvailableDisplays();
+            if (AdapterInfos.Count > 0) 
+                SelectedAdapter = AdapterInfos[0];
         }
 
         // ====== Commands（會自動產生 XxxCommand 屬性）======
@@ -73,6 +84,7 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void ReadBefore()
         {
+            MessageBox.Show(selectedAdapter.Name);
             InitDemoDataCore();
         }
         private byte GetFillByte()
@@ -92,22 +104,13 @@ namespace GMTI2CUpdater
             // fallback
             return 0xFF;
         }
-
-        // 對應 XAML: LoadHexCommand
-        [RelayCommand]
-        private void LoadHex()
+        public void LoadHexFromFile(string filePath)
         {
-            var dlg = new OpenFileDialog
-            {
-                Filter = "Intel HEX (*.hex)|*.hex|All files (*.*)|*.*"
-            };
-
-            if (dlg.ShowDialog() != true)
+            if (string.IsNullOrWhiteSpace(filePath))
                 return;
 
             try
             {
-                var filePath = dlg.FileName;
                 var lines = File.ReadAllLines(filePath);
 
                 // 解析 HEX
@@ -137,7 +140,7 @@ namespace GMTI2CUpdater
                 for (int i = 0; i < size; i++)
                 {
                     buffer[i] = fill;
-                    defined[i] = false;   // 預設都是「未定義」 → HexView 會顯示 XX
+                    defined[i] = false;   // 預設都是「未定義」 → HexView 顯示 XX
                 }
 
                 // 把 HEX 資料套進 buffer
@@ -156,14 +159,14 @@ namespace GMTI2CUpdater
                 TargetData = buffer;
                 TargetDefinedMap = defined;
                 TargetRangeText = FormatRange(BaseAddress, buffer.Length);
-
-                // Demo：如果 BeforeData 長度跟 HEX 不同，就重新初始化一次
+                TargetChecksum = CalculateChecksum(TargetData, TargetDefinedMap);
+                // Demo：讓 BeforeData 長度跟 HEX 一致，方便比對
                 if (BeforeData == null || BeforeData.Length != buffer.Length)
                 {
                     Log("BeforeData 長度與 HEX 影像不同，Demo 模式自動重新初始化 BeforeData 以配合 HEX 範圍。");
-                    int oldBase = BaseAddress; // 已經設成 HEX 最小位址
-                    InitDemoDataCore();        // 會用目前 TotalSize 建出相同長度的 BeforeData
-                    BaseAddress = oldBase;     // 保持 BaseAddress
+                    int oldBase = BaseAddress;
+                    InitDemoDataCore();        // 使用目前 TotalSize 建出 BeforeData
+                    BaseAddress = oldBase;
                     BeforeRangeText = FormatRange(BaseAddress, BeforeData.Length);
                 }
 
@@ -177,6 +180,22 @@ namespace GMTI2CUpdater
                 StatusMessage = "HEX 載入失敗";
             }
         }
+
+        // 對應 XAML: LoadHexCommand
+        [RelayCommand]
+        private void LoadHex()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Intel HEX (*.hex)|*.hex|All files (*.*)|*.*"
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                LoadHexFromFile(dlg.FileName);
+            }
+        }
+
 
 
         // 對應 XAML: UpdateCommand
@@ -372,11 +391,30 @@ namespace GMTI2CUpdater
             return 256;
         }
 
+        private string CalculateChecksum(byte[] data, bool[] defineMaps)
+        {
+            if (data == null || data.Length == 0 ||
+                defineMaps == null || defineMaps.Length == 0 || 
+                defineMaps.Length != data.Length)
+                return "-";
+
+            ushort sum = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (!defineMaps[i])
+                    continue;   // 未定義的位址不計入 checksum
+                byte b = data[i];
+                sum += b;
+            }
+
+            //short checksum = (sum & 0xFFFF);
+            return $"0x{sum:X4}";
+        }
         private string FormatRange(int baseAddr, int size)
         {
             if (size <= 0) return "-";
             int end = baseAddr + size - 1;
-            return $"0x{baseAddr:X4} - 0x{end:X4} ({size} bytes)";
+            return $"0x{baseAddr:X2}-0x{end:X2} ({size} bytes)";
         }
 
         private void Log(string message)
