@@ -5,8 +5,194 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:GMTI2CUpdater"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="I2C更新工具" Height="480" Width="1080">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- I2C 控制列 -->
+            <RowDefinition Height="*"/>
+            <!-- 3 個 HexView -->
+            <RowDefinition Height="Auto"/>
+            <!-- Log / 狀態列 -->
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Padding="8" BorderThickness="0,0,0,1" BorderBrush="LightGray">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- I2C 設定 -->
+                <TextBlock Text="Bus：" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox Width="80" SelectedItem="{Binding SelectedBus}"/>
 
+                <TextBlock Text="Device Addr：" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                <TextBox Width="70" Text="{Binding DeviceAddress}" ToolTip="例如 0x50"/>
+
+                <TextBlock Text="Page Size：" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                <TextBox Width="60" Text="{Binding PageSize}"/>
+
+                <TextBlock Text="Total Size：" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                <TextBox Width="80" Text="{Binding TotalSize}" ToolTip="要操作的總 Bytes"/>
+
+                <Separator Margin="12,0" Width="1"/>
+
+                <!-- 主要操作按鈕 -->
+                <Button Content="讀取目前資料" Margin="8,0,0,0"
+                        Command="{Binding ReadBeforeCommand}"/>
+                <Button Content="載入欲更新資料 (HEX)" Margin="4,0,0,0"
+                        Command="{Binding LoadHexCommand}"/>
+                <Button Content="開始更新" Margin="4,0,0,0"
+                        Command="{Binding UpdateCommand}"/>
+                <Button Content="更新後回讀" Margin="4,0,0,0"
+                        Command="{Binding ReadAfterCommand}"/>
+                <Button Content="比對結果" Margin="4,0,0,0"
+                        Command="{Binding CompareCommand}"/>
+            </StackPanel>
+        </Border>
+        <!-- Row 1: 三個 HexView -->
+        <Grid Grid.Row="1" Margin="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 1. Before -->
+            <GroupBox Grid.Column="0" Header="1. 還未執行 Update 前的資料 (Before)" Margin="0,0,4,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- 工具列 -->
+                        <RowDefinition Height="*"/>
+                        <!-- HexView -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 小工具列 -->
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="4">
+                        <TextBlock Text="範圍：" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BeforeRangeText}" Margin="4,0"/>
+                        <CheckBox Content="同步捲動" Margin="12,0,0,0"
+                                  IsChecked="{Binding IsSyncScrollEnabled}"/>
+                    </StackPanel>
+
+                    <!-- HexView 控制項（之後自己實作） -->
+                    <local:HexViewControl Grid.Row="1"
+                                          Data="{Binding BeforeData}"
+                                          BaseAddress="{Binding BaseAddress}"
+                                          DefinedMap="{Binding BeforeDefinedMap}"
+                                          SyncScrollKey="Before"
+                                          SyncScrollEnabled="{Binding IsSyncScrollEnabled}"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- 2. Target (載入 Intel HEX) -->
+            <GroupBox Grid.Column="1" Header="2. 我想要變更的資料 (Target / Intel HEX)" Margin="2,0,2,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- 工具列 -->
+                        <RowDefinition Height="*"/>
+                        <!-- HexView -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Target 工具列 -->
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="4">
+                        <TextBlock Text="檔案：" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding HexFileName}" Margin="4,0" Width="180"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock Text="範圍：" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding TargetRangeText}" Margin="0,0"/>
+
+                        <TextBlock Text="未定義區填值：" Margin="12,0,4,0" VerticalAlignment="Center"/>
+                        <ComboBox Width="80" SelectedItem="{Binding FillMode}">
+                            <ComboBoxItem Content="0xFF"/>
+                            <ComboBoxItem Content="0x00"/>
+                            <ComboBoxItem Content="自訂"/>
+                        </ComboBox>
+                        <TextBox Width="50" Margin="4,0,0,0"
+                                 Text="{Binding CustomFillValue}"
+                                 ToolTip="例如 FF"/>
+
+                        <CheckBox Content="顯示與 Before 差異" Margin="12,0,0,0"
+                                  IsChecked="{Binding ShowDiffWithBefore}"/>
+                    </StackPanel>
+
+                    <!-- HexView -->
+                    <local:HexViewControl Grid.Row="1"
+                                          Data="{Binding TargetData}"
+                                          BaseAddress="{Binding BaseAddress}"
+                                          DefinedMap="{Binding TargetDefinedMap}"
+                                          HighlightDiffSource="{Binding BeforeData}"
+                                          ShowDiff="{Binding ShowDiffWithBefore}"
+                                          SyncScrollKey="Target"
+                                          SyncScrollEnabled="{Binding IsSyncScrollEnabled}"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- 3. After -->
+            <GroupBox Grid.Column="2" Header="3. 執行 Update 後回讀的資料 (After)" Margin="4,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- 工具列 -->
+                        <RowDefinition Height="*"/>
+                        <!-- HexView -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 小工具列 -->
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="4">
+                        <TextBlock Text="範圍：" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding AfterRangeText}" Margin="4,0"/>
+
+                        <CheckBox Content="顯示與 Target 差異" Margin="12,0,0,0"
+                                  IsChecked="{Binding ShowDiffWithTarget}"/>
+                    </StackPanel>
+
+                    <!-- HexView -->
+                    <local:HexViewControl Grid.Row="1"
+                                          Data="{Binding AfterData}"
+                                          BaseAddress="{Binding BaseAddress}"
+                                          DefinedMap="{Binding AfterDefinedMap}"
+                                          HighlightDiffSource="{Binding TargetData}"
+                                          ShowDiff="{Binding ShowDiffWithTarget}"
+                                          SyncScrollKey="After"
+                                          SyncScrollEnabled="{Binding IsSyncScrollEnabled}"/>
+                </Grid>
+            </GroupBox>
+        </Grid>
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="100"/>
+                <!-- Log -->
+                <RowDefinition Height="Auto"/>
+                <!-- StatusBar -->
+            </Grid.RowDefinitions>
+
+            <GroupBox Grid.Row="0" Header="操作記錄 (Log)" Margin="8,0,8,4">
+                <DockPanel>
+                    <Button Content="清除" DockPanel.Dock="Top" Margin="0,0,0,4"
+                            Command="{Binding ClearLogCommand}"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding LogItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Margin="2,0"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </GroupBox>
+
+            <StatusBar Grid.Row="1">
+                <StatusBarItem Content="{Binding I2CStatusText}"/>
+                <StatusBarItem>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="進度：" Margin="0,0,4,0"/>
+                        <ProgressBar Width="150" Height="12"
+                                     Minimum="0" Maximum="100"
+                                     Value="{Binding Progress}"/>
+                    </StackPanel>
+                </StatusBarItem>
+                <StatusBarItem Content="{Binding StatusMessage}"/>
+            </StatusBar>
+        </Grid>
     </Grid>
 </Window>

@@ -1,0 +1,120 @@
+﻿<UserControl x:Class="GMTI2CUpdater.HexViewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:GMTI2CUpdater"
+             MinWidth="200" MinHeight="100">
+    <Border BorderBrush="Gray"
+            BorderThickness="1"
+            Background="#FF1E1E1E"
+            Padding="4">
+        <!-- 一個 ScrollViewer 同時負責水平/垂直捲動 -->
+        <ScrollViewer x:Name="PART_ScrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- ===== Column Header 列 ===== -->
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <!-- Address 欄 -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 間隔 -->
+                        <ColumnDefinition Width="8"/>
+                        <!-- Bytes 欄 -->
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Address 標題 -->
+                    <TextBlock Grid.Column="0"
+                               Text="Addr"
+                               FontFamily="Consolas"
+                               Foreground="#FF5EC7FF"
+                               Margin="0,0,4,0"/>
+
+                    <!-- Byte 00~0F 標題，寬度要跟下面的 Byte 格一樣 -->
+                    <ItemsControl Grid.Column="2"
+                                  ItemsSource="{Binding ColumnHeaders, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="26"
+                                        Padding="1,0"
+                                        Margin="0,0,2,0">
+                                    <TextBlock Text="{Binding}"
+                                               FontFamily="Consolas"
+                                               Foreground="#FFAAAAAA"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+
+                <!-- ===== 資料列 ===== -->
+                <ItemsControl ItemsSource="{Binding Lines, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:HexLineViewModel}">
+                            <Grid Margin="0,0,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <!-- Address -->
+                                    <ColumnDefinition Width="Auto"/>
+                                    <!-- 間隔 -->
+                                    <ColumnDefinition Width="8"/>
+                                    <!-- Hex Bytes -->
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 位址欄 -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding AddressText}"
+                                           FontFamily="Consolas"
+                                           Foreground="#FF5EC7FF"
+                                           Margin="0,0,4,0"/>
+
+                                <!-- 十六進位 Bytes （寬度要跟 header 格一樣）-->
+                                <ItemsControl Grid.Column="2"
+                                              ItemsSource="{Binding Bytes}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type local:HexByteViewModel}">
+                                            <Border Width="26"
+                                                    Padding="1,0"
+                                                    Margin="0,0,2,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="ToolTip"
+                                                                Value="{Binding Offset, StringFormat=Offset: 0x{0:X4}}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsDiff}" Value="True">
+                                                                <!-- 有差異的 Byte 用淡紅色背景 -->
+                                                                <Setter Property="Background" Value="#40FF1010"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding DisplayText}"
+                                                   FontFamily="Consolas"
+                                                   Foreground="White"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>
