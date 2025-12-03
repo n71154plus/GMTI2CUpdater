@@ -36,7 +36,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         private const int CtlAuxMaxDataSize = 0x0084; // 132 bytes
 
-        private const int MaxI2cReadChunk = 0x10;  // 每次 I2C 讀取最大長度
+        private const int MaxI2cReadChunk = 0x04;  // 每次 I2C 讀取最大長度
         private const int MaxI2cWriteChunk = 0x04; // 每次 I2C 寫入最大資料 byte 數
 
         private const uint CtlInitAppVersion = 0x00010001;
@@ -328,7 +328,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 DataSize = (uint)length,
                 Data = new byte[CtlAuxMaxDataSize]
             };
-
+            
             uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
             if (r != CtlResultSuccess)
                 throw new InvalidOperationException(
@@ -362,6 +362,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             Array.Copy(data, 0, args.Data, 0, data.Length);
 
             uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+            
             if (r != CtlResultSuccess)
                 throw new InvalidOperationException(
                     string.Format("Intel IGCL: ctlAUXAccess(write) failed: 0x{0:X8}", r));
@@ -393,6 +394,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             args.Data[0] = data;
 
             uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+            
             if (r != CtlResultSuccess)
                 throw new InvalidOperationException(
                     $"Intel IGCL: ctlAUXAccess(I2C write) failed: 0x{r:X8}");
@@ -439,6 +441,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Array.Copy(data, offset, args.Data, 1, chunkLen);
 
                 uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+                
                 if (r != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C write byte-index) failed: 0x{r:X8}");
@@ -491,6 +494,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Array.Copy(data, offset, args.Data, 2, chunkLen);
 
                 uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+                
                 if (r != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C write UInt16-index) failed: 0x{r:X8}");
@@ -522,6 +526,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             };
 
             uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+            
             if (r != CtlResultSuccess)
                 throw new InvalidOperationException(
                     $"Intel IGCL: ctlAUXAccess(I2C read) failed: 0x{r:X8}");
@@ -535,6 +540,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         // 1-byte index，從 index 起連續讀取 length 個 byte
         public byte[] ReadI2CByteIndex(I2CAdapterInfo display, byte address, byte index, int length)
         {
+            IntPtr deviceHandle = SelectDisplay(display);
             EnsureNotDisposed();
 
             if (length <= 0)
@@ -560,7 +566,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 argsIndex.Data[0] = index;
 
-                uint rIndex = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref argsIndex);
+                uint rIndex = NativeMethods.ctlAUXAccess(deviceHandle, ref argsIndex);
+                
                 if (rIndex != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C write index) failed: 0x{rIndex:X8}");
@@ -593,7 +600,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                     Data = new byte[CtlAuxMaxDataSize]
                 };
 
-                uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+                uint r = NativeMethods.ctlAUXAccess(deviceHandle, ref args);
+                
                 if (r != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C read byte-index) failed: 0x{r:X8}");
@@ -611,6 +619,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         // 16-bit index（大端），從 index 起連續讀取 length 個 byte
         public byte[] ReadI2CUInt16Index(I2CAdapterInfo display, byte address, ushort index, int length)
         {
+            IntPtr deviceHandle = SelectDisplay(display);
             EnsureNotDisposed();
 
             if (length <= 0)
@@ -641,7 +650,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 argsIndex.Data[0] = hi;
                 argsIndex.Data[1] = lo;
 
-                uint rIndex = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref argsIndex);
+                uint rIndex = NativeMethods.ctlAUXAccess(deviceHandle, ref argsIndex);
+                
                 if (rIndex != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C write UInt16-index) failed: 0x{rIndex:X8}");
@@ -674,7 +684,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                     Data = new byte[CtlAuxMaxDataSize]
                 };
 
-                uint r = NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
+                uint r = NativeMethods.ctlAUXAccess(deviceHandle, ref args);
+                
                 if (r != CtlResultSuccess)
                     throw new InvalidOperationException(
                         $"Intel IGCL: ctlAUXAccess(I2C read UInt16-index) failed: 0x{r:X8}");

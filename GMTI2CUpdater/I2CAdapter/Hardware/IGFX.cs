@@ -39,7 +39,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         // DPCD / I2C chunk 設定
         private const int MaxDpcdChunk = 0x10;    // 每次 DPCD 讀寫最大長度
-        private const int MaxI2cReadChunk = 0x10;  // 每次 I2C 讀取最大長度
+        private const int MaxI2cReadChunk = 0x04;  // 每次 I2C 讀取最大長度
         private const int MaxI2cWriteChunk = 0x04; // 每次 I2C 寫入最大資料 byte 數
 
         private const int AuxBufferSize = 0x40;    // AUX buffer 固定大小

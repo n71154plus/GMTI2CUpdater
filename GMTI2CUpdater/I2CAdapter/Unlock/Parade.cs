@@ -53,6 +53,7 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             adapter.WriteDpcd(0x0480, [0x2d]);
             adapter.WriteDpcd(0x0480, [0x46]);
             adapter.WriteDpcd(0x0480, [0x57]);
+
             adapter.WriteDpcd(0x0480, [0x2d]);
             adapter.WriteDpcd(0x0480, [0x44]);
             adapter.WriteDpcd(0x0480, [0x50]);
@@ -60,8 +61,10 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             adapter.WriteDpcd(0x0480, [0x06]);
             adapter.WriteDpcd(0x0480, [0x03]);
             adapter.WriteDpcd(0x0480, [0x03]);
+            byte status = adapter.ReadDpcd(0x480, 1)[0];
             adapter.WriteDpcd(0x048B, [0x90]);
-            adapter.WriteDpcd(0x04BE, [(byte)(deviceAddress | 0x01)]);
+            byte ddc = (byte)(deviceAddress | 0x01);
+            adapter.WriteDpcd(0x048E, [ddc]);
         }
     }
 }
