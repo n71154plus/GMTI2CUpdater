@@ -9,6 +9,10 @@
         DragOver="Window_DragOver"
         Drop="Window_Drop"
         Title="Global Mixed Technology - I2C更新工具" Height="720" Width="1280">
+    <Window.Resources>
+        <!-- 把 Converter 宣告成資源 -->
+        <local:ByteToHexConverter x:Key="ByteToHexConverter" />
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -25,9 +29,56 @@
                 <ComboBox Width="Auto" ItemsSource="{Binding AdapterInfos}"
                           DisplayMemberPath="Name"
                           SelectedItem="{Binding SelectedAdapter}"/>
-
+                <TextBlock Text="需要系統管理員權限" VerticalAlignment="Center" Margin="2,0,0,0" Foreground="Red">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <!-- 預設不顯示 -->
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AdviceNeedAdmin}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="選擇解鎖指令" VerticalAlignment="Center" Margin="2,0,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <!-- 預設不顯示 -->
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ComboBox Width="Auto" ItemsSource="{Binding TCONUnlockBases}"
+                          DisplayMemberPath="Name"
+                          SelectedItem="{Binding SelectedAdaptertCONUnlock}">
+                    <ComboBox.Style>
+                        <Style TargetType="ComboBox">
+                            <!-- 預設不顯示 -->
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Style>
+                </ComboBox>
                 <TextBlock Text="Device Addr：" Margin="12,0,4,0" VerticalAlignment="Center"/>
-                <TextBox Width="Auto" Text="{Binding DeviceAddress}" ToolTip="例如 0x50"/>
+                <ComboBox Width="Auto" ItemsSource="{Binding DeviceAddressCollection}" SelectedItem="{Binding SelectedDeviceAddress}" ToolTip="使用8bit Byte表示">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <!-- 每個 item 顯示成 0x00 這種格式 -->
+                            <TextBlock Text="{Binding Converter={StaticResource ByteToHexConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
                 <TextBlock Text="Total Size：" Margin="12,0,4,0" VerticalAlignment="Center"/>
                 <TextBlock Width="Auto" Text="{Binding TotalSize}" VerticalAlignment="Center" ToolTip="Total Bytes"/>
@@ -35,20 +86,22 @@
                 <Separator Margin="12,0" Width="1"/>
 
                 <!-- 主要操作按鈕 -->
-                <Button Content="讀取目前資料" Margin="8,0,0,0"
-                        Command="{Binding ReadBeforeCommand}"/>
-                <Button Content="載入欲更新資料 (HEX)" Margin="4,0,0,0"
+                <Button Content="1：載入欲更新資料(HEX)" Margin="4,0,0,0"
                         Command="{Binding LoadHexCommand}"/>
-                <Button Content="開始更新" Margin="4,0,0,0"
+                <Button Content="2：讀取目前資料" Margin="8,0,0,0"
+                        Command="{Binding ReadBeforeCommand}"/>
+                <Button Content="3：開始更新" Margin="4,0,0,0"
                         Command="{Binding UpdateCommand}"/>
-                <Button Content="更新後回讀" Margin="4,0,0,0"
+                <Button Content="4：更新後回讀" Margin="4,0,0,0"
                         Command="{Binding ReadAfterCommand}"/>
-                <Button Content="比對結果" Margin="4,0,0,0"
-                        Command="{Binding CompareCommand}"/>
+                <Button Content="5：燒錄" Margin="4,0,0,0"
+                        Command="{Binding WriteEEPROMCommand}"/>
+                <Button Content="6：Apply(1~5)" Margin="4,0,0,0"
+                        Command="{Binding ApplyAllCommand}"/>
             </StackPanel>
         </Border>
         <!-- Row 1: 三個 HexView -->
-        <Grid Grid.Row="1" Margin="8">
+        <Grid Grid.Row="1" Margin="8" MinHeight="300">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -72,8 +125,8 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="檔案：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding HexFileName}" Margin="4,0" Width="Auto"
+                            <TextBlock Text="Adapter：" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedAdapter.Name}" Margin="4,0" Width="Auto"
                                    TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4">
@@ -93,6 +146,8 @@
                                           Data="{Binding BeforeData}"
                                           BaseAddress="{Binding BaseAddress}"
                                           DefinedMap="{Binding BeforeDefinedMap}"
+                                          HighlightDiffSource="{Binding TargetData}"
+                                          ShowDiff="{Binding ShowDiffWithTarget}"
                                           SyncScrollKey="Before"
                                           SyncScrollEnabled="{Binding IsSyncScrollEnabled}"/>
                 </Grid>
@@ -159,8 +214,8 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="檔案：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding HexFileName}" Margin="4,0" Width="Auto"
+                            <TextBlock Text="Adapter：" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedAdapter.Name}" Margin="4,0" Width="Auto"
                                    TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4">
@@ -186,7 +241,7 @@
                 </Grid>
             </GroupBox>
         </Grid>
-        <Grid Grid.Row="2" MinHeight="250">
+        <Grid Grid.Row="2" MaxHeight="250">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <!-- Log -->

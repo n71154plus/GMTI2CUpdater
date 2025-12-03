@@ -7,7 +7,13 @@
 	<LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <Platforms>AnyCPU;x64</Platforms>
+    <ApplicationIcon>logo_32bit_transparent.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="logo_32bit_transparent.ico" />
+  </ItemGroup>
   <ItemGroup>
 	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 	<PackageReference Include="Costura.Fody" Version="6.0.0" PrivateAssets="all" />

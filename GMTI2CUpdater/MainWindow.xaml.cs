@@ -10,7 +10,7 @@ namespace GMTI2CUpdater
         public MainWindow()
         {
             InitializeComponent();
-            DataContext = new MainWindowViewModel();
+            //DataContext = new MainWindowViewModel();
         }
         private void Window_DragOver(object sender, DragEventArgs e)
         {
