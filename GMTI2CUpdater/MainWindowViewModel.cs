@@ -16,6 +16,7 @@ namespace GMTI2CUpdater
 {
     public partial class MainWindowViewModel : ObservableObject
     {
+        private readonly LuaTconUnlockLoader luaTconUnlockLoader = new();
         [ObservableProperty]
         private bool hasMonitorChanged;
         [ObservableProperty]
@@ -136,10 +137,19 @@ namespace GMTI2CUpdater
         {
             if (SelectedAdapter == null)
                 return;
-            TCONUnlockBases = new List<TCONUnlockBase>() {new Parade(SelectedAdapter),new NT71837(SelectedAdapter), new NT71856(SelectedAdapter) };
-            var ini = new IniFile("config.ini");
-            string TCON = ini.Get("Adapter", "TCON", "");
-            SelectedAdaptertCONUnlock = TCONUnlockBases.FirstOrDefault(t => t.Name == TCON);
+            try
+            {
+                TCONUnlockBases = luaTconUnlockLoader.Load(SelectedAdapter).ToList();
+                var ini = new IniFile("config.ini");
+                string TCON = ini.Get("Adapter", "TCON", "");
+                SelectedAdaptertCONUnlock = TCONUnlockBases.FirstOrDefault(t => t.Name == TCON) ?? TCONUnlockBases.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                Log($"載入 TCON 解鎖腳本失敗：{ex.Message}");
+                TCONUnlockBases = new List<TCONUnlockBase>();
+                SelectedAdaptertCONUnlock = null;
+            }
         }
         // ====== Commands（會自動產生 XxxCommand 屬性）======
 
