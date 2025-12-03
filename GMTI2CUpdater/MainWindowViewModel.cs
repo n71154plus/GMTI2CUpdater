@@ -130,6 +130,16 @@ namespace GMTI2CUpdater
                 SelectedAdapter = AdapterInfos[0];
         }
 
+        private (byte? UnlockIndex, byte? UnlockCommand, byte? LockIndex, byte? LockCommand) ReadLockCommands()
+        {
+            return (
+                ReadIniHexByte("I2CSpec", "I2CUnLockIndex"),
+                ReadIniHexByte("I2CSpec", "I2CUnlockCMD"),
+                ReadIniHexByte("I2CSpec", "I2CLockIndex"),
+                ReadIniHexByte("I2CSpec", "I2CLockCMD")
+            );
+        }
+
         private byte? ReadIniHexByte(string section, string key, string defaultValue = "Null")
         {
             return HexHelper.ParseHexByteOrNull(configFile.Get(section, key, defaultValue));
@@ -224,22 +234,43 @@ namespace GMTI2CUpdater
             }
         }
 
+        private void ExecuteWithOptionalLockCommands(
+            I2CAdapterBase adapter,
+            byte deviceAddress,
+            (byte? UnlockIndex, byte? UnlockCommand, byte? LockIndex, byte? LockCommand) lockCommands,
+            Action<I2CAdapterBase> action)
+        {
+            if (lockCommands.UnlockIndex.HasValue && lockCommands.UnlockCommand.HasValue)
+            {
+                adapter.WriteI2CByteIndex(deviceAddress, lockCommands.UnlockIndex.Value, [lockCommands.UnlockCommand.Value]);
+            }
+
+            action(adapter);
+
+            if (lockCommands.LockIndex.HasValue && lockCommands.LockCommand.HasValue)
+            {
+                adapter.WriteI2CByteIndex(deviceAddress, lockCommands.LockIndex.Value, [lockCommands.LockCommand.Value]);
+            }
+        }
+
         private void UpdateBeforeMetadata()
         {
-            BeforeChecksum = CalculateChecksum(BeforeData, TargetDefinedMap);
-            BeforeRangeText = FormatRange(BaseAddress, BeforeData?.Length ?? 0);
+            (BeforeRangeText, BeforeChecksum) = BuildMetadata(BeforeData, TargetDefinedMap);
         }
 
         private void UpdateAfterMetadata()
         {
-            AfterChecksum = CalculateChecksum(AfterData, TargetDefinedMap);
-            AfterRangeText = FormatRange(BaseAddress, AfterData?.Length ?? 0);
+            (AfterRangeText, AfterChecksum) = BuildMetadata(AfterData, TargetDefinedMap);
         }
 
         private void UpdateTargetMetadata()
         {
-            TargetRangeText = FormatRange(BaseAddress, TargetData?.Length ?? 0);
-            TargetChecksum = CalculateChecksum(TargetData, TargetDefinedMap);
+            (TargetRangeText, TargetChecksum) = BuildMetadata(TargetData, TargetDefinedMap);
+        }
+
+        private (string RangeText, string Checksum) BuildMetadata(byte[] data, bool[] definedMap)
+        {
+            return (FormatRange(BaseAddress, data?.Length ?? 0), CalculateChecksum(data, definedMap));
         }
         partial void OnSelectedAdapterChanged(I2CAdapterBase value)
         {
@@ -396,10 +427,7 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void Update()
         {
-            byte? i2CUnLockIndex = ReadIniHexByte("I2CSpec", "I2CUnLockIndex");
-            byte? i2CUnlockCMD = ReadIniHexByte("I2CSpec", "I2CUnlockCMD");
-            byte? i2CLockIndex = ReadIniHexByte("I2CSpec", "I2CLockIndex");
-            byte? i2ClockCMD = ReadIniHexByte("I2CSpec", "I2CLockCMD");
+            var lockCommands = ReadLockCommands();
             Progress = 0;
 
             if (!EnsureOperationReady())
@@ -410,19 +438,8 @@ namespace GMTI2CUpdater
             var deviceaddress = SelectedDeviceAddress;
 
             if (TryPerformWithAdapter(nameof(Update), deviceaddress, adapter =>
-            {
-                if (i2CUnLockIndex.HasValue && i2CUnlockCMD.HasValue)
-                {
-                    adapter.WriteI2CByteIndex(deviceaddress, i2CUnLockIndex.Value, [i2CUnlockCMD.Value]);
-                }
-
-                WriteDiffBytes(adapter, deviceaddress, (byte)BaseAddress, BeforeData, TargetData);
-
-                if (i2CLockIndex.HasValue && i2ClockCMD.HasValue)
-                {
-                    adapter.WriteI2CByteIndex(deviceaddress, i2CLockIndex.Value, [i2ClockCMD.Value]);
-                }
-            }))
+                ExecuteWithOptionalLockCommands(adapter, deviceaddress, lockCommands, innerAdapter =>
+                    WriteDiffBytes(innerAdapter, deviceaddress, (byte)BaseAddress, BeforeData, TargetData))))
             {
                 Log("Update 成功");
                 Progress = 100;
@@ -453,9 +470,21 @@ namespace GMTI2CUpdater
                 Log("beforeData 與 targetData 長度不一致，無法進行差異寫入");
                 return;
             }
-                
+
 
             int length = beforeData.Length;
+
+            void WriteDiffRun(int runStartIndex, int runEndIndex)
+            {
+                int runLength = runEndIndex - runStartIndex;
+                byte startAddress = (byte)(baseAddress + runStartIndex);
+
+                byte[] buffer = new byte[runLength];
+                Array.Copy(targetData, runStartIndex, buffer, 0, runLength);
+
+                Log($"準備寫入Device Address:{deviceAddress:X2} Index:{startAddress:X2} Data: {BitConverter.ToString(buffer)}");
+                adapter.WriteI2CByteIndex(deviceAddress, startAddress, buffer);
+            }
 
             int runStartIndex = -1; // 目前連續差異區段的起始 index（在陣列裡）
             for (int i = 0; i < length; i++)
@@ -475,20 +504,7 @@ namespace GMTI2CUpdater
                     // 沒差異，且之前有正在累積的區段 -> 把那一段送出去
                     if (runStartIndex != -1)
                     {
-                        int runLength = i - runStartIndex;
-
-                        // 計算這一段在 I2C 上的起始位址
-                        byte startAddress = (byte)(baseAddress + runStartIndex);
-
-                        // 把 targetData 中這一段差異內容複製出來
-                        byte[] buffer = new byte[runLength];
-                        Array.Copy(targetData, runStartIndex, buffer, 0, runLength);
-
-                        Log($"準備寫入Device Address:{deviceAddress:X2} Index:{startAddress:X2} Data: {BitConverter.ToString(buffer)}");
-                        // ✅ 一次寫入一整段連續的差異
-                        adapter.WriteI2CByteIndex(deviceAddress, startAddress, buffer);
-
-                        // 關閉這段
+                        WriteDiffRun(runStartIndex, i);
                         runStartIndex = -1;
                     }
                 }
@@ -497,13 +513,7 @@ namespace GMTI2CUpdater
             // 處理「最後一段恰好延伸到結尾」的情況
             if (runStartIndex != -1)
             {
-                int runLength = length - runStartIndex;
-                byte startAddress = (byte)(baseAddress + runStartIndex);
-
-                byte[] buffer = new byte[runLength];
-                Array.Copy(targetData, runStartIndex, buffer, 0, runLength);
-                Log($"準備寫入Device Address:{deviceAddress:X2} Index:{startAddress:X2} Data: {BitConverter.ToString(buffer)}");
-                adapter.WriteI2CByteIndex(deviceAddress, startAddress, buffer);
+                WriteDiffRun(runStartIndex, length);
             }
         }
 
@@ -537,10 +547,7 @@ namespace GMTI2CUpdater
         {
             var writeEEPROMIndex = ReadIniHexByte("I2CSpec", "WriteEEPROMIndex");
             var writeEEPROMCMD = ReadIniHexByte("I2CSpec", "WriteEEPROMCMD");
-            var i2CUnLockIndex = ReadIniHexByte("I2CSpec", "I2CUnLockIndex");
-            var i2CUnlockCMD = ReadIniHexByte("I2CSpec", "I2CUnlockCMD");
-            var i2CLockIndex = ReadIniHexByte("I2CSpec", "I2CLockIndex");
-            var i2ClockCMD = ReadIniHexByte("I2CSpec", "I2CLockCMD");
+            var lockCommands = ReadLockCommands();
             //byte ResetEEPROMIndex = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMIndex", "Null"));
             //byte ResetEEPROMCMD = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMCMD", "Null"));
 
@@ -558,19 +565,8 @@ namespace GMTI2CUpdater
             var deviceaddress = SelectedDeviceAddress;
 
             if (TryPerformWithAdapter(nameof(WriteEEPROM), deviceaddress, adapter =>
-            {
-                if (i2CUnLockIndex.HasValue && i2CUnlockCMD.HasValue)
-                {
-                    adapter.WriteI2CByteIndex(deviceaddress, i2CUnLockIndex.Value, [i2CUnlockCMD.Value]);
-                }
-
-                adapter.WriteI2CByteIndex(deviceaddress, writeEEPROMIndex.Value, [writeEEPROMCMD.Value]);
-
-                if (i2CLockIndex.HasValue && i2ClockCMD.HasValue)
-                {
-                    adapter.WriteI2CByteIndex(deviceaddress, i2CLockIndex.Value, [i2ClockCMD.Value]);
-                }
-            }))
+                ExecuteWithOptionalLockCommands(adapter, deviceaddress, lockCommands, innerAdapter =>
+                    innerAdapter.WriteI2CByteIndex(deviceaddress, writeEEPROMIndex.Value, [writeEEPROMCMD.Value]))))
             {
                 Log("燒錄 成功");
             }
