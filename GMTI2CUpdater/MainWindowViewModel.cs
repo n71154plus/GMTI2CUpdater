@@ -1,22 +1,24 @@
-﻿using System.IO;
-using System.Globalization;
-using Microsoft.Win32;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using GMTI2CUpdater.I2CAdapter;
-using System.Windows;
 using GMTI2CUpdater.Helper;
-using GMTI2CUpdater.Service;
+using GMTI2CUpdater.I2CAdapter;
 using GMTI2CUpdater.I2CAdapter.Unlock;
-using System.Windows.Markup;
-using System;
+using GMTI2CUpdater.Service;
+using Microsoft.Win32;
+using System.Windows;
 
 namespace GMTI2CUpdater
 {
     public partial class MainWindowViewModel : ObservableObject
     {
         private readonly LuaTconUnlockLoader luaTconUnlockLoader = new();
+        private readonly IniFile configFile = new("config.ini");
         [ObservableProperty]
         private bool hasMonitorChanged;
         [ObservableProperty]
@@ -71,10 +73,10 @@ namespace GMTI2CUpdater
         // Log 集合本身用 ObservableCollection 即可
         public ObservableCollection<string> LogItems { get; } = new();
 
+        private bool NeedsDisplayUnlock => SelectedAdapter?.AdapterInfo.IsFromDisplay == true;
+
         public MainWindowViewModel(MonitorService monitorSvc)
         {
-            // 初始一般設定
-            //SelectedBus = "I2C-1";
             monitorSvc.MonitorChanged += OnMonitorChanged;
             IsAdmin = PrivilegeHelper.IsRunAsAdministrator();
             BaseAddress = 0;
@@ -91,15 +93,18 @@ namespace GMTI2CUpdater
             StatusMessage = "Ready";
             Progress = 0;
             InitDeviceAddressCollection();
-            //InitDemoDataCore();
             RefreshMonitor();
-            var ini = new IniFile("config.ini");
-            string HexFile = ini.Get("Target", "Filename", "");
-            if (File.Exists(HexFile))
+            LoadLastHexFromConfig();
+        }
+        private void LoadLastHexFromConfig()
+        {
+            string hexFile = configFile.Get("Target", "Filename", "");
+            if (File.Exists(hexFile))
             {
-                LoadHexFromFile(HexFile);
+                LoadHexFromFile(hexFile);
             }
         }
+
         private void InitDeviceAddressCollection()
         {
             DeviceAddressCollection = new byte[128];
@@ -107,10 +112,12 @@ namespace GMTI2CUpdater
             {
                 DeviceAddressCollection[i] = (byte)(i << 1);
             }
-            var ini = new IniFile("config.ini");
-            byte? deviceaddressfromIni = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "DeviceAddress", "0x00"));
+
+            var deviceaddressfromIni = ReadIniHexByte("I2CSpec", "DeviceAddress", "0x00");
             if (deviceaddressfromIni != null)
+            {
                 SelectedDeviceAddress = deviceaddressfromIni.Value;
+            }
         }
         private void OnMonitorChanged(bool added)
         {
@@ -121,6 +128,118 @@ namespace GMTI2CUpdater
             AdapterInfos = I2CAdapterManger.GetAvailableDisplays();
             if (AdapterInfos.Count > 0)
                 SelectedAdapter = AdapterInfos[0];
+        }
+
+        private byte? ReadIniHexByte(string section, string key, string defaultValue = "Null")
+        {
+            return HexHelper.ParseHexByteOrNull(configFile.Get(section, key, defaultValue));
+        }
+
+        private bool EnsureAdapterSelected()
+        {
+            if (SelectedAdapter != null)
+            {
+                return true;
+            }
+
+            Log("請先選擇 I2C Adapter");
+            return false;
+        }
+
+        private bool EnsureTargetSizeReady()
+        {
+            if (TotalSize > 0)
+            {
+                return true;
+            }
+
+            Log("請先在Target欄位讀取Hex檔以便設定需要讀取的位址與長度");
+            return false;
+        }
+
+        private bool EnsureUnlockConfigured()
+        {
+            if (!NeedsDisplayUnlock || SelectedAdaptertCONUnlock != null)
+            {
+                return true;
+            }
+
+            Log("使用I2C over Aux，但未選擇解鎖指令");
+            return false;
+        }
+
+        private bool EnsureOperationReady(bool requireSize = true)
+        {
+            if (!EnsureAdapterSelected())
+            {
+                return false;
+            }
+
+            if (requireSize && !EnsureTargetSizeReady())
+            {
+                return false;
+            }
+
+            if (!EnsureUnlockConfigured())
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryPerformWithAdapter(string operationName, byte deviceAddress, Action<I2CAdapterBase> action)
+        {
+            try
+            {
+                ExecuteWithOptionalUnlock(deviceAddress, action);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"{operationName} 失敗：{ex.Message}");
+                return false;
+            }
+        }
+
+        private void ExecuteWithOptionalUnlock(byte deviceAddress, Action<I2CAdapterBase> action)
+        {
+            bool needUnlock = NeedsDisplayUnlock && SelectedAdaptertCONUnlock != null;
+
+            if (needUnlock)
+            {
+                SelectedAdaptertCONUnlock.Unlock(deviceAddress);
+            }
+
+            try
+            {
+                action(SelectedAdapter);
+            }
+            finally
+            {
+                if (needUnlock)
+                {
+                    SelectedAdaptertCONUnlock.Lock(deviceAddress);
+                }
+            }
+        }
+
+        private void UpdateBeforeMetadata()
+        {
+            BeforeChecksum = CalculateChecksum(BeforeData, TargetDefinedMap);
+            BeforeRangeText = FormatRange(BaseAddress, BeforeData?.Length ?? 0);
+        }
+
+        private void UpdateAfterMetadata()
+        {
+            AfterChecksum = CalculateChecksum(AfterData, TargetDefinedMap);
+            AfterRangeText = FormatRange(BaseAddress, AfterData?.Length ?? 0);
+        }
+
+        private void UpdateTargetMetadata()
+        {
+            TargetRangeText = FormatRange(BaseAddress, TargetData?.Length ?? 0);
+            TargetChecksum = CalculateChecksum(TargetData, TargetDefinedMap);
         }
         partial void OnSelectedAdapterChanged(I2CAdapterBase value)
         {
@@ -140,9 +259,8 @@ namespace GMTI2CUpdater
             try
             {
                 TCONUnlockBases = luaTconUnlockLoader.Load(SelectedAdapter).ToList();
-                var ini = new IniFile("config.ini");
-                string TCON = ini.Get("Adapter", "TCON", "");
-                SelectedAdaptertCONUnlock = TCONUnlockBases.FirstOrDefault(t => t.Name == TCON) ?? TCONUnlockBases.FirstOrDefault();
+                string tcon = configFile.Get("Adapter", "TCON", "");
+                SelectedAdaptertCONUnlock = TCONUnlockBases.FirstOrDefault(t => t.Name == tcon) ?? TCONUnlockBases.FirstOrDefault();
             }
             catch (Exception ex)
             {
@@ -157,34 +275,19 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void ReadBefore()
         {
-            byte deviceaddress = SelectedDeviceAddress;
-            if (TotalSize <= 0)
+            if (!EnsureOperationReady())
             {
-                Log($"請先在Target欄位讀取Hex檔以便設定需要讀取的位址與長度");
                 return;
             }
-            if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock == null)
+
+            var deviceaddress = SelectedDeviceAddress;
+
+            if (TryPerformWithAdapter(nameof(ReadBefore), deviceaddress, adapter =>
+                BeforeData = adapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize)))
             {
-                Log($"使用I2C over Aux，但未選擇解鎖指令");
-                return;
+                Log("ReadBefore 成功");
+                UpdateBeforeMetadata();
             }
-            try
-            {
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Unlock(deviceaddress);
-                if ((SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null) || !SelectedAdapter.AdapterInfo.IsFromDisplay )
-                    BeforeData = SelectedAdapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize);
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Lock(deviceaddress);
-            }
-            catch (Exception ex)
-            {
-                Log($"ReadBefore 失敗：{ex.Message}");
-                return;
-            }
-            Log($"ReadBefore 成功");
-            BeforeChecksum = CalculateChecksum(BeforeData, TargetDefinedMap);
-            BeforeRangeText = FormatRange(BaseAddress, BeforeData.Length);
             //InitDemoDataCore();
         }
 
@@ -259,9 +362,7 @@ namespace GMTI2CUpdater
 
                 TargetData = buffer;
                 TargetDefinedMap = defined;
-                TargetRangeText = FormatRange(BaseAddress, buffer.Length);
-                TargetChecksum = CalculateChecksum(TargetData, TargetDefinedMap);
-
+                UpdateTargetMetadata();
 
                 ShowDiffWithBefore = true;
                 StatusMessage = "HEX 載入完成";
@@ -295,48 +396,37 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void Update()
         {
-            var ini = new IniFile("config.ini");
-            byte? I2CUnLockIndex = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CUnLockIndex", "Null"));
-            byte? I2CUnlockCMD = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CUnlockCMD", "Null"));
-            byte? I2CLockIndex = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CLockIndex", "Null"));
-            byte? I2ClockCMD = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CLockCMD", "Null"));
+            byte? i2CUnLockIndex = ReadIniHexByte("I2CSpec", "I2CUnLockIndex");
+            byte? i2CUnlockCMD = ReadIniHexByte("I2CSpec", "I2CUnlockCMD");
+            byte? i2CLockIndex = ReadIniHexByte("I2CSpec", "I2CLockIndex");
+            byte? i2ClockCMD = ReadIniHexByte("I2CSpec", "I2CLockCMD");
             Progress = 0;
-            if (TotalSize <= 0)
+
+            if (!EnsureOperationReady())
             {
-                Log($"請先在Target欄位讀取Hex檔以便設定需要讀取的位址與長度");
                 return;
             }
-            if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock == null)
-            {
-                Log($"使用I2C over Aux，但未選擇解鎖指令");
-                return;
-            }
-            byte deviceaddress = SelectedDeviceAddress;
-            try
-            {
 
+            var deviceaddress = SelectedDeviceAddress;
 
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Unlock(deviceaddress);
-                if ((SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null) || !SelectedAdapter.AdapterInfo.IsFromDisplay)
+            if (TryPerformWithAdapter(nameof(Update), deviceaddress, adapter =>
+            {
+                if (i2CUnLockIndex.HasValue && i2CUnlockCMD.HasValue)
                 {
-                    if (I2CUnLockIndex.HasValue && I2CUnlockCMD.HasValue)
-                        SelectedAdapter.WriteI2CByteIndex(deviceaddress, I2CUnLockIndex.Value, [I2CUnlockCMD.Value]);
-                    WriteDiffBytes(SelectedAdapter, deviceaddress, (byte)BaseAddress, BeforeData, TargetData);
-                    if (I2CLockIndex.HasValue && I2ClockCMD.HasValue)
-                        SelectedAdapter.WriteI2CByteIndex(deviceaddress, I2CLockIndex.Value, [I2ClockCMD.Value]);
+                    adapter.WriteI2CByteIndex(deviceaddress, i2CUnLockIndex.Value, [i2CUnlockCMD.Value]);
                 }
 
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Lock(deviceaddress);
-            }
-            catch (Exception ex)
+                WriteDiffBytes(adapter, deviceaddress, (byte)BaseAddress, BeforeData, TargetData);
+
+                if (i2CLockIndex.HasValue && i2ClockCMD.HasValue)
+                {
+                    adapter.WriteI2CByteIndex(deviceaddress, i2CLockIndex.Value, [i2ClockCMD.Value]);
+                }
+            }))
             {
-                Log($"Update 失敗：{ex.Message}");
-                return;
+                Log("Update 成功");
+                Progress = 100;
             }
-            Log($"Update 成功");
-            Progress = 100;
         }
         public void WriteDiffBytes(I2CAdapterBase adapter,
             byte deviceAddress,
@@ -349,8 +439,13 @@ namespace GMTI2CUpdater
                 Log("beforeData 為 null，無法進行差異寫入，請先讀取目前資料");
                 return;
             }
-            if (targetData == null) { 
-                Log("targetData 為 null，無法進行差異寫入，，請先載入欲更新的資料");
+            if (targetData == null) {
+                Log("targetData 為 null，無法進行差異寫入，請先載入欲更新的資料");
+                return;
+            }
+            if (TargetDefinedMap == null)
+            {
+                Log("Target 定義範圍為 null，無法進行差異寫入");
                 return;
             }
             if (beforeData.Length != targetData.Length)
@@ -416,35 +511,19 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void ReadAfter()
         {
-            byte deviceaddress = SelectedDeviceAddress;
-            if (TotalSize <= 0)
+            if (!EnsureOperationReady())
             {
-                Log($"請先在Target欄位讀取Hex檔以便設定需要讀取的位址與長度");
                 return;
             }
-            if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock == null)
-            {
-                Log($"使用I2C over Aux，但未選擇解鎖指令");
-                return;
-            }
-            try
-            {
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Unlock(deviceaddress);
-                if ((SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null) || !SelectedAdapter.AdapterInfo.IsFromDisplay)
-                    AfterData = SelectedAdapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize);
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Lock(deviceaddress);
-            }
-            catch (Exception ex)
-            {
-                Log($"ReadBefore 失敗：{ex.Message}");
-                return;
-            }
-            AfterChecksum = CalculateChecksum(AfterData, TargetDefinedMap);
-            AfterRangeText = FormatRange(BaseAddress, AfterData.Length);
 
-            Log($"ReadBefore 成功");
+            var deviceaddress = SelectedDeviceAddress;
+
+            if (TryPerformWithAdapter(nameof(ReadAfter), deviceaddress, adapter =>
+                AfterData = adapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize)))
+            {
+                UpdateAfterMetadata();
+                Log("ReadAfter 成功");
+            }
         }
 
         // 對應 XAML: CompareCommand
@@ -456,59 +535,54 @@ namespace GMTI2CUpdater
         [RelayCommand]
         private void WriteEEPROM()
         {
-            var ini = new IniFile("config.ini");
-            byte? WriteEEPROMIndex = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "WriteEEPROMIndex", "Null"));
-            byte? WriteEEPROMCMD = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "WriteEEPROMCMD", "Null"));
-            byte? I2CUnLockIndex = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CUnLockIndex", "Null"));
-            byte? I2CUnlockCMD = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CUnlockCMD", "Null"));
-            byte? I2CLockIndex = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CLockIndex", "Null"));
-            byte? I2ClockCMD = HexHelper.ParseHexByteOrNull(ini.Get("I2CSpec", "I2CLockCMD", "Null"));
+            var writeEEPROMIndex = ReadIniHexByte("I2CSpec", "WriteEEPROMIndex");
+            var writeEEPROMCMD = ReadIniHexByte("I2CSpec", "WriteEEPROMCMD");
+            var i2CUnLockIndex = ReadIniHexByte("I2CSpec", "I2CUnLockIndex");
+            var i2CUnlockCMD = ReadIniHexByte("I2CSpec", "I2CUnlockCMD");
+            var i2CLockIndex = ReadIniHexByte("I2CSpec", "I2CLockIndex");
+            var i2ClockCMD = ReadIniHexByte("I2CSpec", "I2CLockCMD");
             //byte ResetEEPROMIndex = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMIndex", "Null"));
             //byte ResetEEPROMCMD = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMCMD", "Null"));
 
-            if (WriteEEPROMIndex == null || WriteEEPROMCMD == null)
+            if (writeEEPROMIndex == null || writeEEPROMCMD == null)
             {
                 Log($"請先在config.ini設定燒錄的Command參數");
                 return;
             }
 
-            if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock == null)
+            if (!EnsureOperationReady(requireSize: false))
             {
-                Log($"使用I2C over Aux，但未選擇解鎖指令");
                 return;
             }
-            byte deviceaddress = SelectedDeviceAddress;
-            try
+
+            var deviceaddress = SelectedDeviceAddress;
+
+            if (TryPerformWithAdapter(nameof(WriteEEPROM), deviceaddress, adapter =>
             {
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Unlock(deviceaddress);
-                if (WriteEEPROMIndex.HasValue && WriteEEPROMCMD.HasValue &&(SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null) || !SelectedAdapter.AdapterInfo.IsFromDisplay)
+                if (i2CUnLockIndex.HasValue && i2CUnlockCMD.HasValue)
                 {
-                    if (I2CUnLockIndex.HasValue && I2CUnlockCMD.HasValue)
-                        SelectedAdapter.WriteI2CByteIndex(deviceaddress, I2CUnLockIndex.Value, [I2CUnlockCMD.Value]);
-                    SelectedAdapter.WriteI2CByteIndex(deviceaddress, WriteEEPROMIndex.Value, [WriteEEPROMCMD.Value]);
-                    if (I2CLockIndex.HasValue && I2ClockCMD.HasValue)
-                        SelectedAdapter.WriteI2CByteIndex(deviceaddress, I2CLockIndex.Value, [I2ClockCMD.Value]);
+                    adapter.WriteI2CByteIndex(deviceaddress, i2CUnLockIndex.Value, [i2CUnlockCMD.Value]);
                 }
-                if (SelectedAdapter.AdapterInfo.IsFromDisplay && SelectedAdaptertCONUnlock != null)
-                    SelectedAdaptertCONUnlock.Lock(deviceaddress);
-            }
-            catch (Exception ex)
+
+                adapter.WriteI2CByteIndex(deviceaddress, writeEEPROMIndex.Value, [writeEEPROMCMD.Value]);
+
+                if (i2CLockIndex.HasValue && i2ClockCMD.HasValue)
+                {
+                    adapter.WriteI2CByteIndex(deviceaddress, i2CLockIndex.Value, [i2ClockCMD.Value]);
+                }
+            }))
             {
-                Log($"燒錄 失敗：{ex.Message}");
-                return;
+                Log("燒錄 成功");
             }
-            Log($"燒錄 成功");
         }
         [RelayCommand]
         private void ApplyAll()
         {
             Log($"Step1：讀取Hex檔");
-            var ini = new IniFile("config.ini");
-            string HexFile = ini.Get("Target", "Filename", "");
-            if (File.Exists(HexFile))
+            string hexFile = configFile.Get("Target", "Filename", "");
+            if (File.Exists(hexFile))
             {
-                LoadHexFromFile(HexFile);
+                LoadHexFromFile(hexFile);
             }
             else
             {
