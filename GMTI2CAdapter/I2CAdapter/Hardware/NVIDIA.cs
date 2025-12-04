@@ -5,7 +5,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
     /// <summary>
     /// NVIDIA NVAPI DPCD / AUX 封裝。
-    /// 參考原本 Golang nvapiDriver + nvapiProcs 的邏輯，
     /// 但介面風格比照 IntelIGFX.IntelCui。
     /// </summary>
     public sealed class NvidiaApi : IDisposable
@@ -24,12 +23,10 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private NvAPI_GetErrorMessageDelegate _nvGetErrorMessage = null!;
         private NvAPI_Disp_DpAuxChannelControlDelegate _nvDisp_DpAuxChannelControl = null!;
 
-        // 狀態碼（與 Golang 範例一致）
         private const int NvapiStatusOk = 0x00000000;
         private const int NvapiStatusEndEnumeration = unchecked((int)0xFFFFFFF9);
         private const int NvapiDpAuxTimeout = 0x000000FF;
 
-        // QueryInterface ID（與 Golang 範例一致）
         private const uint Qi_Initialize = 0x0150E828;
         private const uint Qi_EnumPhysicalGPUs = 0xE5AC921F;
         private const uint Qi_EnumNvidiaDisplayHandle = 0x9ABDD40D;
@@ -40,14 +37,12 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private const uint Qi_Disp_DpAuxChannelControl = 0x8EB56969;
         private const uint Qi_NvUnload = 0xD22BDD7E;
 
-        // nvDPInfoV1 size / version（與 Golang 一致）
         private const int NvDPInfoV1Size = 44;
         private const uint NvDPInfoV1Version = 0x10000u | NvDPInfoV1Size;
 
         // nvDpAuxParamsV1 version
         private const uint NvDpAuxParamsV1Version = 0x00010028;
 
-        // AUX 操作碼與限制（與 Golang 一致）
         private const uint DpAuxOpWriteDpcd = 0;
         private const uint DpAuxOpReadDpcd = 1;
         private const uint DpAuxOpWriteI2CLast = 2;
@@ -91,7 +86,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             _disposed = true;
 
-            // NVAPI 官方有 NvAPI_Unload，但原本 Golang 範例也沒呼叫，
             // 一般來說讓 process 結束時 OS 自行清理即可。
             // 如果要更完整，可以再加上 QueryInterface 取得 NvAPI_Unload。
         }
@@ -154,7 +148,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 status = _nvGetAssociatedDisplayOutputId(handle, ref outputId);
                 if (status != NvapiStatusOk)
                 {
-                    // 這裡與 Golang 範例一樣：如果失敗就 skip
                     index++;
                     continue;
                 }
