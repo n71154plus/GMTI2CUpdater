@@ -117,7 +117,7 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
         public EmbeddedLuaScriptLoader(Assembly assembly, string resourcePrefix)
         {
             this.assembly = assembly ?? throw new ArgumentNullException(nameof(assembly));
-            this.resourcePrefix = resourcePrefix.EndsWith('.') ? resourcePrefix : resourcePrefix + ".";
+            this.resourcePrefix = resourcePrefix.EndsWith(",") ? resourcePrefix : resourcePrefix + ".";
             resourceNames = new HashSet<string>(assembly.GetManifestResourceNames(), StringComparer.OrdinalIgnoreCase);
         }
 
