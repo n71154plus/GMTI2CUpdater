@@ -324,9 +324,8 @@ namespace GMTI2CUpdater
         }
         private void UpdateAdviceNeedAdmin()
         {
-            // 假設 abc 是 bool，如果是 AdapterInfo.IsNeedPrivilege 就改那個
+            // 根據介面是否需要進階權限與目前登入狀態決定是否提示使用者以系統管理員執行。
             AdviceNeedAdmin = (SelectedAdapter?.AdapterInfo.IsNeedPrivilege ?? false) && !IsAdmin;
-            // 例：AdviceNeedAdmin = (SelectedAdapter?.AdapterInfo?.IsNeedPrivilege ?? false) && IsAdmin;
         }
 
         /// <summary>

@@ -32,11 +32,49 @@ namespace GMTI2CUpdater.I2CAdapter
         /// <returns>實際寫入的位元組數。</returns>
         void WriteDpcd(uint address, byte[] data);
 
+        /// <summary>
+        /// 直接寫入 I2C 裝置的單一位元組，不帶 index。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
+        /// <param name="data">要寫入的資料。</param>
         void WriteI2CWithoutIndex(byte address, byte data);
+
+        /// <summary>
+        /// 以 8-bit index 寫入 I2C 裝置資料。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
+        /// <param name="index">8-bit index。</param>
+        /// <param name="data">要寫入的資料。</param>
         void WriteI2CByteIndex(byte address, byte index, byte[] data);
+
+        /// <summary>
+        /// 以 16-bit index 寫入 I2C 裝置資料。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
+        /// <param name="index">16-bit index。</param>
+        /// <param name="data">要寫入的資料。</param>
         void WriteI2CUInt16Index(byte address, ushort index, byte[] data);
+
+        /// <summary>
+        /// 直接讀取 I2C 裝置的單一位元組，不帶 index。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
         byte ReadI2CWithoutIndex(byte address);
+
+        /// <summary>
+        /// 以 8-bit index 讀取 I2C 裝置資料。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
+        /// <param name="index">8-bit index。</param>
+        /// <param name="length">要讀取的長度。</param>
         byte[] ReadI2CByteIndex(byte address, byte index, int length);
+
+        /// <summary>
+        /// 以 16-bit index 讀取 I2C 裝置資料。
+        /// </summary>
+        /// <param name="address">I2C 裝置位址。</param>
+        /// <param name="index">16-bit index。</param>
+        /// <param name="length">要讀取的長度。</param>
         byte[] ReadI2CUInt16Index(byte address, ushort index, int length);
     }
 }
