@@ -744,7 +744,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         #region 內部：QueryInterface & 結構 helper
 
-        private static T GetProc<T>(uint id) where T : class
+        private static T? GetProc<T>(uint id) where T : class
         {
             IntPtr ptr = NvapiNative.NvAPI_QueryInterface(id);
             if (ptr == IntPtr.Zero)

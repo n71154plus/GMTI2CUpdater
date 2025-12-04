@@ -244,10 +244,12 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(groupKey))
                 return;
 
+            string syncKey = groupKey;
+
             if (Math.Abs(e.VerticalChange) < double.Epsilon)
                 return;
 
-            SyncGroupScroll(groupKey, this, e.VerticalOffset);
+            SyncGroupScroll(syncKey, this, e.VerticalOffset);
         }
 
         /// <summary>
@@ -274,12 +276,13 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(key))
                 return;
 
-            _registeredGroupKey = key;
+            string groupKey = key;
+            _registeredGroupKey = groupKey;
 
-            if (!_syncGroups.TryGetValue(key, out var list))
+            if (!_syncGroups.TryGetValue(groupKey, out var list))
             {
                 list = new List<WeakReference<HexViewControl>>();
-                _syncGroups[key] = list;
+                _syncGroups[groupKey] = list;
             }
 
             foreach (var wr in list)
@@ -299,7 +302,9 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(key))
                 return;
 
-            if (!_syncGroups.TryGetValue(key, out var list))
+            string groupKey = key;
+
+            if (!_syncGroups.TryGetValue(groupKey, out var list))
                 return;
 
             list.RemoveAll(wr =>
@@ -311,7 +316,7 @@ namespace GMTI2CUpdater
 
             if (list.Count == 0)
             {
-                _syncGroups.Remove(key);
+                _syncGroups.Remove(groupKey);
             }
         }
 

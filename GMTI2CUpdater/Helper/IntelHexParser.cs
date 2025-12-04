@@ -51,6 +51,7 @@ namespace GMTI2CUpdater
             int upperLinearBase = 0;   // type 04: upper 16 bits << 16
             int upperSegmentBase = 0;  // type 02: upper 16 bits << 4
             bool useLinear = false;
+            bool eofSeen = false;
             int lineNumber = 0;
 
             foreach (var rawLine in lines)
@@ -160,6 +161,7 @@ namespace GMTI2CUpdater
             // 如果你要強制 EOF 存在，可以這裡改成 throw
             // if (!eofSeen)
             //     throw new FormatException("Intel HEX 檔缺少 EOF (type 01) 記錄。");
+            _ = eofSeen;
 
             if (!minAddress.HasValue || !maxAddress.HasValue)
             {
