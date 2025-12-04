@@ -15,7 +15,7 @@ namespace GMTI2CUpdater.I2CAdapter
     public sealed class Cy8C24894Adapter : I2CAdapterBase
     {
         private const int ReportLength = 65;
-        private const int MaxI2CChunk = 55;
+        private const int MaxI2CChunk = 32;
 
         private readonly HidDevice _hid;
         private readonly I2C_Frequency _frequency;
