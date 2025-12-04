@@ -1,4 +1,5 @@
 ﻿using GMTI2CUpdater.Helper;
+using System;
 using Microsoft.Win32;
 
 
@@ -16,7 +17,7 @@ namespace GMTI2CUpdater.Service
         /// <summary>
         /// 螢幕數量變更事件，布林值代表是否為新增。
         /// </summary>
-        public event Action<bool> MonitorChanged;
+        public event Action<bool>? MonitorChanged;
 
         /// <summary>
         /// 建構服務並立即記錄初始螢幕數，同時訂閱系統事件。

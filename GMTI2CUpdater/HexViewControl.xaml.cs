@@ -14,9 +14,9 @@ namespace GMTI2CUpdater
         private const int BytesPerLine = 16;
 
         public IReadOnlyList<string> ColumnHeaders { get; }
-        private ScrollViewer _scrollViewer;
+        private ScrollViewer? _scrollViewer;
         private bool _isInternalScrollChange;
-        private string _registeredGroupKey;
+        private string? _registeredGroupKey;
 
         // 捲動同步群組：Key = SyncScrollKey
         private static readonly Dictionary<string, List<WeakReference<HexViewControl>>> _syncGroups
@@ -44,14 +44,14 @@ namespace GMTI2CUpdater
 
         #region 依賴屬性
 
-        public byte[] Data
+        public byte[]? Data
         {
-            get => (byte[])GetValue(DataProperty);
+            get => (byte[]?)GetValue(DataProperty);
             set => SetValue(DataProperty, value);
         }
-        public bool[] DefinedMap
+        public bool[]? DefinedMap
         {
-            get => (bool[])GetValue(DefinedMapProperty);
+            get => (bool[]?)GetValue(DefinedMapProperty);
             set => SetValue(DefinedMapProperty, value);
         }
 
@@ -106,9 +106,9 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 用來比對差異的資料來源，例如 Before / Target
         /// </summary>
-        public byte[] HighlightDiffSource
+        public byte[]? HighlightDiffSource
         {
-            get => (byte[])GetValue(HighlightDiffSourceProperty);
+            get => (byte[]?)GetValue(HighlightDiffSourceProperty);
             set => SetValue(HighlightDiffSourceProperty, value);
         }
 
@@ -150,9 +150,9 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 同步捲動的群組 Key（同樣 Key 的 HexView 會同步）
         /// </summary>
-        public string SyncScrollKey
+        public string? SyncScrollKey
         {
-            get => (string)GetValue(SyncScrollKeyProperty);
+            get => (string?)GetValue(SyncScrollKeyProperty);
             set => SetValue(SyncScrollKeyProperty, value);
         }
 
@@ -214,12 +214,12 @@ namespace GMTI2CUpdater
 
             if (!string.IsNullOrWhiteSpace(_registeredGroupKey))
             {
-                UnregisterFromGroup(_registeredGroupKey);
+                UnregisterFromGroup(_registeredGroupKey!);
                 _registeredGroupKey = null;
             }
         }
 
-        private ScrollViewer FindScrollViewer()
+        private ScrollViewer? FindScrollViewer()
         {
             // 直接拿 XAML 上的 PART_ScrollViewer
             return PART_ScrollViewer;
@@ -240,19 +240,20 @@ namespace GMTI2CUpdater
             if (!SyncScrollEnabled)
                 return;
 
-            if (string.IsNullOrWhiteSpace(_registeredGroupKey))
+            var groupKey = _registeredGroupKey;
+            if (string.IsNullOrWhiteSpace(groupKey))
                 return;
 
             if (Math.Abs(e.VerticalChange) < double.Epsilon)
                 return;
 
-            SyncGroupScroll(_registeredGroupKey, this, e.VerticalOffset);
+            SyncGroupScroll(groupKey, this, e.VerticalOffset);
         }
 
         /// <summary>
         /// 處理 SyncScrollKey 變更時的註冊與取消註冊邏輯。
         /// </summary>
-        private void UpdateSyncRegistration(string oldKey, string newKey)
+        private void UpdateSyncRegistration(string? oldKey, string? newKey)
         {
             if (!string.IsNullOrWhiteSpace(oldKey))
             {

@@ -25,7 +25,7 @@ namespace GMTI2CUpdater
         [ObservableProperty]
         private bool hasMonitorChanged;
         [ObservableProperty]
-        private string monitorStatus;
+        private string monitorStatus = string.Empty;
 
 
 
@@ -33,45 +33,45 @@ namespace GMTI2CUpdater
         // ====== 這些會自動產生 public 屬性 ======
         [ObservableProperty] private bool adviceNeedAdmin;
         [ObservableProperty] private bool isAdmin;
-        [ObservableProperty] private I2CAdapterBase selectedAdapter;
-        [ObservableProperty] private List<TCONUnlockBase> tCONUnlockBases;
-        [ObservableProperty] private TCONUnlockBase selectedAdaptertCONUnlock;
+        [ObservableProperty] private I2CAdapterBase? selectedAdapter;
+        [ObservableProperty] private List<TCONUnlockBase> tCONUnlockBases = new();
+        [ObservableProperty] private TCONUnlockBase? selectedAdaptertCONUnlock;
 
-        [ObservableProperty] private byte[] deviceAddressCollection;
+        [ObservableProperty] private byte[] deviceAddressCollection = Array.Empty<byte>();
         [ObservableProperty] private byte selectedDeviceAddress;
 
         [ObservableProperty] private byte deviceAddress;
         [ObservableProperty] private int totalSize;
         [ObservableProperty] private int baseAddress;
 
-        [ObservableProperty] private bool[] beforeDefinedMap;
-        [ObservableProperty] private bool[] targetDefinedMap;
-        [ObservableProperty] private bool[] afterDefinedMap;
+        [ObservableProperty] private bool[]? beforeDefinedMap;
+        [ObservableProperty] private bool[]? targetDefinedMap;
+        [ObservableProperty] private bool[]? afterDefinedMap;
 
-        [ObservableProperty] private byte[] beforeData;
-        [ObservableProperty] private byte[] targetData;
-        [ObservableProperty] private byte[] afterData;
+        [ObservableProperty] private byte[]? beforeData;
+        [ObservableProperty] private byte[]? targetData;
+        [ObservableProperty] private byte[]? afterData;
 
-        [ObservableProperty] private string beforeChecksum;
-        [ObservableProperty] private string targetChecksum;
-        [ObservableProperty] private string afterChecksum;
+        [ObservableProperty] private string beforeChecksum = "-";
+        [ObservableProperty] private string targetChecksum = "-";
+        [ObservableProperty] private string afterChecksum = "-";
 
-        [ObservableProperty] private string beforeRangeText;
-        [ObservableProperty] private string targetRangeText;
-        [ObservableProperty] private string afterRangeText;
+        [ObservableProperty] private string beforeRangeText = "-";
+        [ObservableProperty] private string targetRangeText = "-";
+        [ObservableProperty] private string afterRangeText = "-";
         [ObservableProperty] private bool isSyncScrollEnabled;
         [ObservableProperty] private bool showDiffWithBefore;
         [ObservableProperty] private bool showDiffWithTarget;
 
-        [ObservableProperty] private string hexFileName;
-        [ObservableProperty] private string fillMode;
-        [ObservableProperty] private string customFillValue;
+        [ObservableProperty] private string hexFileName = string.Empty;
+        [ObservableProperty] private string fillMode = string.Empty;
+        [ObservableProperty] private string customFillValue = string.Empty;
 
-        [ObservableProperty] private string i2CStatusText;
-        [ObservableProperty] private string statusMessage;
+        [ObservableProperty] private string i2CStatusText = string.Empty;
+        [ObservableProperty] private string statusMessage = string.Empty;
         [ObservableProperty] private double progress;
 
-        [ObservableProperty] private List<I2CAdapterBase> adapterInfos;
+        [ObservableProperty] private List<I2CAdapterBase> adapterInfos = new();
 
         // Log 集合本身用 ObservableCollection 即可
         public ObservableCollection<string> LogItems { get; } = new();
@@ -236,9 +236,16 @@ namespace GMTI2CUpdater
 
         private bool TryPerformWithAdapter(string operationName, byte deviceAddress, Action<I2CAdapterBase> action)
         {
+            var adapter = SelectedAdapter;
+            if (adapter == null)
+            {
+                Log($"{operationName} 失敗：未選擇 I2C Adapter");
+                return false;
+            }
+
             try
             {
-                ExecuteWithOptionalUnlock(deviceAddress, action);
+                ExecuteWithOptionalUnlock(adapter, deviceAddress, action);
                 return true;
             }
             catch (Exception ex)
@@ -251,24 +258,24 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 依需求先執行解鎖腳本，再進行 I2C 動作，最後確保重新上鎖。
         /// </summary>
-        private void ExecuteWithOptionalUnlock(byte deviceAddress, Action<I2CAdapterBase> action)
+        private void ExecuteWithOptionalUnlock(I2CAdapterBase adapter, byte deviceAddress, Action<I2CAdapterBase> action)
         {
             bool needUnlock = NeedsDisplayUnlock && SelectedAdaptertCONUnlock != null;
 
             if (needUnlock)
             {
-                SelectedAdaptertCONUnlock.Unlock(deviceAddress);
+                SelectedAdaptertCONUnlock!.Unlock(deviceAddress);
             }
 
             try
             {
-                action(SelectedAdapter);
+                action(adapter);
             }
             finally
             {
                 if (needUnlock)
                 {
-                    SelectedAdaptertCONUnlock.Lock(deviceAddress);
+                    SelectedAdaptertCONUnlock!.Lock(deviceAddress);
                 }
             }
         }
@@ -313,7 +320,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 根據資料與定義範圍計算顯示文字與 Checksum。
         /// </summary>
-        private (string RangeText, string Checksum) BuildMetadata(byte[] data, bool[] definedMap)
+        private (string RangeText, string Checksum) BuildMetadata(byte[]? data, bool[]? definedMap)
         {
             return (FormatRange(BaseAddress, data?.Length ?? 0), CalculateChecksum(data, definedMap));
         }
@@ -516,8 +523,8 @@ namespace GMTI2CUpdater
         public void WriteDiffBytes(I2CAdapterBase adapter,
             byte deviceAddress,
             byte baseAddress,
-            byte[] beforeData,
-            byte[] targetData)
+            byte[]? beforeData,
+            byte[]? targetData)
         {
             if (adapter == null) throw new ArgumentNullException(nameof(adapter));
             if (beforeData == null){
@@ -839,7 +846,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 依已定義的位元組計算簡單的總和 Checksum，未定義區段不納入計算。
         /// </summary>
-        private string CalculateChecksum(byte[] data, bool[] defineMaps)
+        private string CalculateChecksum(byte[]? data, bool[]? defineMaps)
         {
             if (data == null || data.Length == 0 ||
                 defineMaps == null || defineMaps.Length == 0 ||
