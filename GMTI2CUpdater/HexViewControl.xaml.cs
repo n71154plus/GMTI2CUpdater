@@ -269,7 +269,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 將控制項加入指定的同步群組，避免重複加入相同實例。
         /// </summary>
-        private void RegisterToGroup(string key)
+        private void RegisterToGroup(string? key)
         {
             if (string.IsNullOrWhiteSpace(key))
                 return;
@@ -294,7 +294,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 從同步群組移除控制項，並在群組為空時清理集合。
         /// </summary>
-        private void UnregisterFromGroup(string key)
+        private void UnregisterFromGroup(string? key)
         {
             if (string.IsNullOrWhiteSpace(key))
                 return;

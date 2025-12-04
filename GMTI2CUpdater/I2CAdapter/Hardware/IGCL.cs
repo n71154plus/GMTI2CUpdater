@@ -856,13 +856,13 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             public static extern uint ctlEnumerateDevices(
                 IntPtr apiHandle,
                 ref uint count,
-                [In, Out] IntPtr[] devices);
+                [In, Out] IntPtr[]? devices);
 
             [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
             public static extern uint ctlEnumerateDisplayOutputs(
                 IntPtr deviceHandle,
                 ref uint count,
-                [In, Out] IntPtr[] outputs);
+                [In, Out] IntPtr[]? outputs);
 
             [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
             public static extern uint ctlGetDisplayProperties(

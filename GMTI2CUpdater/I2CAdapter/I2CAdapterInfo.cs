@@ -14,7 +14,7 @@ namespace GMTI2CUpdater.I2CAdapter
         /// <summary>
         /// 介面顯示名稱，通常供 UI 列表呈現使用。
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// 更完整的描述文字，例如裝置型號或來源驅動。
