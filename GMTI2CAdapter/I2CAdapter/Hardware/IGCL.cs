@@ -1,5 +1,6 @@
 ﻿// Target: .NET Framework 4.8
 // Language: C#
+using System;
 using System.Runtime.InteropServices;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
@@ -55,7 +56,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         CTL_RESULT_ERROR_RETRY_OPERATION = 0x40010000,
         CTL_RESULT_ERROR_IGSC_LOADER = 0x40010001,
         CTL_RESULT_ERROR_RESTRICTED_APPLICATION = 0x40010002,
-        CTL_RESULT_ERROR_GENERIC_END = 0x4000FFFF,
         CTL_RESULT_ERROR_CORE_START = 0x44000000,
         CTL_RESULT_ERROR_CORE_OVERCLOCK_NOT_SUPPORTED = 0x44000001,
         CTL_RESULT_ERROR_CORE_OVERCLOCK_VOLTAGE_OUTSIDE_RANGE = 0x44000002,
@@ -164,7 +164,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 { CtlResult.CTL_RESULT_ERROR_RETRY_OPERATION, "operation failed, retry" },
                 { CtlResult.CTL_RESULT_ERROR_IGSC_LOADER, "IGSC library loader not found" },
                 { CtlResult.CTL_RESULT_ERROR_RESTRICTED_APPLICATION, "unsupported application" },
-                { CtlResult.CTL_RESULT_ERROR_GENERIC_END, "generic error code end value" },
                 { CtlResult.CTL_RESULT_ERROR_CORE_START, "core error code start value" },
                 { CtlResult.CTL_RESULT_ERROR_CORE_OVERCLOCK_NOT_SUPPORTED, "overclock not supported" },
                 { CtlResult.CTL_RESULT_ERROR_CORE_OVERCLOCK_VOLTAGE_OUTSIDE_RANGE, "voltage outside acceptable range" },
@@ -422,8 +421,18 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                     r = (CtlResult)NativeMethods.ctlGetDisplayProperties(outHandle, ref props);
                     if (r != CtlResultSuccess)
                         continue;
-                    bool isATTACHED = (props.DisplayConfigFlags & 1u << 1) != 0;
-                    if (!isATTACHED)
+                    if (!props.IsDisplayAttached)
+                        continue;
+                    var encoderProps = new CtlDisplayEncoderProperties
+                    {
+                        Size = (uint)Marshal.SizeOf(typeof(CtlDisplayEncoderProperties)),
+                        Version = 0,
+                        ReservedFields = new uint[16]
+                    };
+                    r = (CtlResult)NativeMethods.ctlGetAdaperDisplayEncoderProperties(outHandle, ref encoderProps);
+                    if (r != CtlResultSuccess)
+                        continue;
+                    if (!encoderProps.IsDisplayPort)
                         continue;
                     var info = new I2CAdapterInfo
                     {
@@ -925,81 +934,153 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         #region Interop 結構 & P/Invoke
 
+        // ===========================
+        // 基本 Flags / Enum
+        // ===========================
+
+        /// <summary>
+        /// C 對應：ctl_display_config_flag_t / ctl_display_config_flags_t
+        /// </summary>
         [Flags]
-        private enum CtlInitFlags : uint
+        internal enum ctl_display_config_flags_t : uint
         {
-            None = 0
+            None = 0,
+
+            CTL_DISPLAY_CONFIG_FLAG_DISPLAY_ACTIVE = 1u << 0, // 顯示器目前是否 Active
+            CTL_DISPLAY_CONFIG_FLAG_DISPLAY_ATTACHED = 1u << 1, // 是否有顯示器或 hub/dongle 接上
+            CTL_DISPLAY_CONFIG_FLAG_IS_DONGLE_CONNECTED_TO_ENCODER = 1u << 2, // 是否有 dongle/protocol converter
+            CTL_DISPLAY_CONFIG_FLAG_DITHERING_ENABLED = 1u << 3, // 是否啟用 dithering
+
+            CTL_DISPLAY_CONFIG_FLAG_MAX = 0x80000000u
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct CtlInitArgs
+        /// <summary>
+        /// C 對應：ctl_protocol_converter_location_flag_t / ctl_protocol_converter_location_flags_t
+        /// </summary>
+        [Flags]
+        internal enum ctl_protocol_converter_location_flags_t : uint
         {
-            public uint Size;
-            public byte Version;
+            None = 0,
 
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public byte[] Reserved;
+            CTL_PROTOCOL_CONVERTER_LOCATION_FLAG_ONBOARD = 1u << 0, // 內建 protocol converter
+            CTL_PROTOCOL_CONVERTER_LOCATION_FLAG_EXTERNAL = 1u << 1, // 外接（dongle / hub）
 
-            public uint AppVersion;
-            public CtlInitFlags Flags;
-            public uint SupportedVersion;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-            public byte[] ApplicationUid;
+            CTL_PROTOCOL_CONVERTER_LOCATION_FLAG_MAX = 0x80000000u
         }
 
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct CtlAuxAccessArgs
+        [Flags]
+        internal enum ctl_output_bpc_flags_t : uint
         {
-            public uint Size;
-            public byte Version;
+            None = 0,
 
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public byte[] Reserved;
+            CTL_OUTPUT_BPC_FLAG_6BPC = 1u << 0, // CTL_BIT(0)
+            CTL_OUTPUT_BPC_FLAG_8BPC = 1u << 1, // CTL_BIT(1)
+            CTL_OUTPUT_BPC_FLAG_10BPC = 1u << 2, // CTL_BIT(2)
+            CTL_OUTPUT_BPC_FLAG_12BPC = 1u << 3, // CTL_BIT(3)
 
-            public uint OpType;
-            public uint Flags;
-            public uint Address;
-            public ulong Rad;
-            public uint PortId;
-            public uint DataSize;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = CtlAuxMaxDataSize)]
-            public byte[] Data;
+            CTL_OUTPUT_BPC_FLAG_MAX = 0x80000000u
         }
 
+        /// <summary>對應 ctl_encoder_config_flag_t</summary>
+        [Flags]
+        internal enum ctl_encoder_config_flags_t : uint
+        {
+            None = 0,
 
-        // 對應 ctl_generic_void_datatype_t
+            CTL_ENCODER_CONFIG_FLAG_INTERNAL_DISPLAY = 1u << 0,
+            CTL_ENCODER_CONFIG_FLAG_VESA_TILED_DISPLAY = 1u << 1,
+            CTL_ENCODER_CONFIG_FLAG_TYPEC_CAPABLE = 1u << 2,
+            CTL_ENCODER_CONFIG_FLAG_TBT_CAPABLE = 1u << 3,
+            CTL_ENCODER_CONFIG_FLAG_DITHERING_SUPPORTED = 1u << 4,
+            CTL_ENCODER_CONFIG_FLAG_VIRTUAL_DISPLAY = 1u << 5,
+            CTL_ENCODER_CONFIG_FLAG_HIDDEN_DISPLAY = 1u << 6,
+            CTL_ENCODER_CONFIG_FLAG_COLLAGE_DISPLAY = 1u << 7,
+            CTL_ENCODER_CONFIG_FLAG_SPLIT_DISPLAY = 1u << 8,
+            CTL_ENCODER_CONFIG_FLAG_COMPANION_DISPLAY = 1u << 9,
+            CTL_ENCODER_CONFIG_FLAG_MGPU_COLLAGE_DISPLAY = 1u << 10,
+
+            CTL_ENCODER_CONFIG_FLAG_MAX = 0x80000000u
+        }
+
+        /// <summary>對應 ctl_std_display_feature_flag_t</summary>
+        [Flags]
+        internal enum ctl_std_display_feature_flags_t : uint
+        {
+            None = 0,
+
+            CTL_STD_DISPLAY_FEATURE_FLAG_HDCP = 1u << 0,
+            CTL_STD_DISPLAY_FEATURE_FLAG_HD_AUDIO = 1u << 1,
+            CTL_STD_DISPLAY_FEATURE_FLAG_PSR = 1u << 2,
+            CTL_STD_DISPLAY_FEATURE_FLAG_ADAPTIVESYNC_VRR = 1u << 3,
+            CTL_STD_DISPLAY_FEATURE_FLAG_VESA_COMPRESSION = 1u << 4,
+            CTL_STD_DISPLAY_FEATURE_FLAG_HDR = 1u << 5,
+            CTL_STD_DISPLAY_FEATURE_FLAG_HDMI_QMS = 1u << 6,
+            CTL_STD_DISPLAY_FEATURE_FLAG_HDR10_PLUS_CERTIFIED = 1u << 7,
+            CTL_STD_DISPLAY_FEATURE_FLAG_VESA_HDR_CERTIFIED = 1u << 8,
+
+            CTL_STD_DISPLAY_FEATURE_FLAG_MAX = 0x80000000u
+        }
+
+        /// <summary>對應 ctl_intel_display_feature_flag_t</summary>
+        [Flags]
+        internal enum ctl_intel_display_feature_flags_t : uint
+        {
+            None = 0,
+
+            CTL_INTEL_DISPLAY_FEATURE_FLAG_DPST = 1u << 0,
+            CTL_INTEL_DISPLAY_FEATURE_FLAG_LACE = 1u << 1,
+            CTL_INTEL_DISPLAY_FEATURE_FLAG_DRRS = 1u << 2,
+            CTL_INTEL_DISPLAY_FEATURE_FLAG_ARC_ADAPTIVE_SYNC_CERTIFIED = 1u << 3,
+
+            CTL_INTEL_DISPLAY_FEATURE_FLAG_MAX = 0x80000000u
+        }
+
+        /// <summary>顯示輸出類型</summary>
+        internal enum ctl_display_output_types_t : int
+        {
+            CTL_DISPLAY_OUTPUT_TYPES_INVALID = 0,
+            CTL_DISPLAY_OUTPUT_TYPES_DISPLAYPORT = 1,
+            CTL_DISPLAY_OUTPUT_TYPES_HDMI = 2,
+            CTL_DISPLAY_OUTPUT_TYPES_DVI = 3,
+            CTL_DISPLAY_OUTPUT_TYPES_MIPI = 4,
+            CTL_DISPLAY_OUTPUT_TYPES_CRT = 5,
+            CTL_DISPLAY_OUTPUT_TYPES_MAX
+        }
+        // ===========================
+        // 共用小結構
+        // ===========================
+
         [StructLayout(LayoutKind.Sequential)]
         internal struct CtlGenericVoidDatatype
         {
-            public IntPtr pData;   // void*
-            public uint size;      // uint32_t
+            public IntPtr pData;  // void*
+            public uint size;     // uint32_t
         }
 
-        // 對應 union ctl_os_display_encoder_identifier_t
+        /// <summary>對應 union ctl_os_display_encoder_identifier_t</summary>
         [StructLayout(LayoutKind.Explicit)]
         internal struct CtlOsDisplayEncoderIdentifier
         {
+            /// <summary>Windows 專用：螢幕 Encoder ID</summary>
             [FieldOffset(0)]
-            public uint WindowsDisplayEncoderID;       // Windows 用
+            public uint WindowsDisplayEncoderID;
 
+            /// <summary>非 Windows 平台用的 generic identifier</summary>
             [FieldOffset(0)]
-            public CtlGenericVoidDatatype DisplayEncoderID; // 非 Windows 用
+            public CtlGenericVoidDatatype DisplayEncoderID;
         }
 
-        // 對應 ctl_revision_datatype_t
+        /// <summary>對應 ctl_revision_datatype_t</summary>
         [StructLayout(LayoutKind.Sequential)]
         internal struct CtlRevisionDatatype
         {
             public byte major_version;
             public byte minor_version;
             public byte revision_version;
-            public byte _padding; // 對齊到 4 bytes（C 那邊也是 3 byte + padding）
+            public byte _padding; // 填滿 4 bytes，讓 layout 跟 C 端一致
         }
 
-        // 對應 ctl_display_timing_t
+        /// <summary>對應 ctl_display_timing_t</summary>
         [StructLayout(LayoutKind.Sequential)]
         internal struct CtlDisplayTiming
         {
@@ -1020,46 +1101,233 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             public uint VSync;
             public float RefreshRate;
             public uint SignalStandard; // ctl_signal_standard_type_t (enum -> uint32_t)
+
             public byte VicId;
             public byte _pad4;
             public byte _pad5;
             public byte _pad6;
         }
+        // ===========================
+        // 初始化 / AUX 存取
+        // ===========================
 
-        // 最重要：對應 _ctl_display_properties_t / ctl_display_properties_t
+        [Flags]
+        internal enum CtlInitFlags : uint
+        {
+            None = 0
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct CtlInitArgs
+        {
+            public uint Size;
+            public byte Version;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+            public byte[] Reserved;
+
+            public uint AppVersion;
+            public CtlInitFlags Flags;
+            public uint SupportedVersion;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public byte[] ApplicationUid;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct CtlAuxAccessArgs
+        {
+            public uint Size;
+            public byte Version;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+            public byte[] Reserved;
+
+            public uint OpType;
+            public uint Flags;
+            public uint Address;
+            public ulong Rad;
+            public uint PortId;
+            public uint DataSize;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = CtlAuxMaxDataSize)]
+            public byte[] Data;
+        }
+
+        // ===========================
+        // Display Properties
+        // ===========================
+
+        /// <summary>
+        /// 對應 _ctl_display_properties_t / ctl_display_properties_t
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         internal struct CtlDisplayProperties
         {
-            public uint Size;       // uint32_t
-            public byte Version;    // uint8_t
+            public uint Size;      // uint32_t
+            public byte Version;   // uint8_t
             public byte _pad1;
             public byte _pad2;
             public byte _pad3;
 
             public CtlOsDisplayEncoderIdentifier OsDisplayEncoderHandle; // union
 
-            // 下面這些在 header 裡都是 typedef 到 uint32_t 的 enum/flags，
-            // 用 uint 對應即可（之後你可以再自行包裝成 enum）
-            public uint Type;                     // ctl_display_output_types_t
-            public uint AttachedDisplayMuxType;   // ctl_attached_display_mux_type_t
-            public uint ProtocolConverterOutput;  // ctl_display_output_types_t
-            public CtlRevisionDatatype SupportedSpec; // ctl_revision_datatype_t
-            public uint SupportedOutputBPCFlags;      // ctl_output_bpc_flags_t
-            public uint ProtocolConverterType;        // ctl_protocol_converter_location_flags_t
-            public uint DisplayConfigFlags;           // ctl_display_config_flags_t
-            public uint FeatureEnabledFlags;          // ctl_std_display_feature_flags_t
-            public uint FeatureSupportedFlags;        // ctl_std_display_feature_flags_t
-            public uint AdvancedFeatureEnabledFlags;  // ctl_intel_display_feature_flags_t
-            public uint AdvancedFeatureSupportedFlags;// ctl_intel_display_feature_flags_t
+            // C header: 這些都是 typedef 到 uint32_t 的 enum / flags
+            // 這裡盡量改成 enum 型別以方便使用。
+            public ctl_display_output_types_t Type;              // ctl_display_output_types_t
+            public uint AttachedDisplayMuxType;                  // ctl_attached_display_mux_type_t (尚未定義，先用 uint)
+            public ctl_display_output_types_t ProtocolConverterOutput; // ctl_display_output_types_t
 
-            public CtlDisplayTiming DisplayTimingInfo; // ctl_display_timing_t
+            public CtlRevisionDatatype SupportedSpec;            // ctl_revision_datatype_t
+            public ctl_output_bpc_flags_t SupportedOutputBPCFlags;   // ctl_output_bpc_flags_t
+
+            public ctl_protocol_converter_location_flags_t ProtocolConverterType; // ctl_protocol_converter_location_flags_t
+            public ctl_display_config_flags_t DisplayConfigFlags;                 // ctl_display_config_flags_t
+
+            public ctl_std_display_feature_flags_t FeatureEnabledFlags;     // ctl_std_display_feature_flags_t
+            public ctl_std_display_feature_flags_t FeatureSupportedFlags;   // ctl_std_display_feature_flags_t
+
+            public ctl_intel_display_feature_flags_t AdvancedFeatureEnabledFlags;   // ctl_intel_display_feature_flags_t
+            public ctl_intel_display_feature_flags_t AdvancedFeatureSupportedFlags; // ctl_intel_display_feature_flags_t
+
+            public CtlDisplayTiming DisplayTimingInfo;           // ctl_display_timing_t
 
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-            public uint[] ReservedFields;             // uint32_t ReservedFields[16]
+            public uint[] ReservedFields;                        // uint32_t ReservedFields[16]
+
+            // ----------------------------
+            // Helper property：像 Nvidia 那樣對 flags 做易讀包裝
+            // ----------------------------
+
+            // BPC 支援狀態
+            public bool Supports6Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_6BPC);
+            public bool Supports8Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_8BPC);
+            public bool Supports10Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_10BPC);
+            public bool Supports12Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_12BPC);
+
+            // DisplayConfigFlags 相關
+            public bool IsDisplayActive =>
+                DisplayConfigFlags.HasFlag(ctl_display_config_flags_t.CTL_DISPLAY_CONFIG_FLAG_DISPLAY_ACTIVE);
+
+            public bool IsDisplayAttached =>
+                DisplayConfigFlags.HasFlag(ctl_display_config_flags_t.CTL_DISPLAY_CONFIG_FLAG_DISPLAY_ATTACHED);
+
+            public bool IsDongleConnected =>
+                DisplayConfigFlags.HasFlag(ctl_display_config_flags_t.CTL_DISPLAY_CONFIG_FLAG_IS_DONGLE_CONNECTED_TO_ENCODER);
+
+            public bool IsDitheringEnabled =>
+                DisplayConfigFlags.HasFlag(ctl_display_config_flags_t.CTL_DISPLAY_CONFIG_FLAG_DITHERING_ENABLED);
+
+            // ProtocolConverterType 相關
+            public bool HasOnboardProtocolConverter =>
+                ProtocolConverterType.HasFlag(ctl_protocol_converter_location_flags_t.CTL_PROTOCOL_CONVERTER_LOCATION_FLAG_ONBOARD);
+
+            public bool HasExternalProtocolConverter =>
+                ProtocolConverterType.HasFlag(ctl_protocol_converter_location_flags_t.CTL_PROTOCOL_CONVERTER_LOCATION_FLAG_EXTERNAL);
+
+            // 標準顯示功能啟用 / 支援
+            public bool HdcpEnabled => FeatureEnabledFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDCP);
+            public bool HdcpSupported => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDCP);
+
+            public bool HdrEnabled => FeatureEnabledFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDR);
+            public bool HdrSupported => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDR);
+
+            public bool AdaptiveSyncVrrEnabled => FeatureEnabledFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_ADAPTIVESYNC_VRR);
+            public bool AdaptiveSyncVrrSupported => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_ADAPTIVESYNC_VRR);
+
+            // Intel 進階功能
+            public bool DpstEnabled => AdvancedFeatureEnabledFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DPST);
+            public bool DpstSupported => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DPST);
+
+            public bool LaceEnabled => AdvancedFeatureEnabledFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_LACE);
+            public bool LaceSupported => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_LACE);
+
+            public bool DrrsEnabled => AdvancedFeatureEnabledFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DRRS);
+            public bool DrrsSupported => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DRRS);
+
+            public bool ArcAdaptiveSyncCertifiedEnabled => AdvancedFeatureEnabledFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_ARC_ADAPTIVE_SYNC_CERTIFIED);
+            public bool ArcAdaptiveSyncCertifiedSupported => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_ARC_ADAPTIVE_SYNC_CERTIFIED);
+
+            public bool IsDisplayPort => Type == ctl_display_output_types_t.CTL_DISPLAY_OUTPUT_TYPES_DISPLAYPORT;
+            public bool IsHdmi => Type == ctl_display_output_types_t.CTL_DISPLAY_OUTPUT_TYPES_HDMI;
+            public bool IsInternalPanel => Type == ctl_display_output_types_t.CTL_DISPLAY_OUTPUT_TYPES_MIPI; // 依照實際需求調整
+        }
+        // ===========================
+        // Display Encoder Properties
+        // ===========================
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct CtlDisplayEncoderProperties
+        {
+            public uint Size;      ///< [in] size of this structure
+            public byte Version;   ///< [in] version of this structure
+            public byte _pad1;
+            public byte _pad2;
+            public byte _pad3;
+
+            public CtlOsDisplayEncoderIdentifier Os_display_encoder_handle;  ///< [out] OS specific Display ID
+
+            public ctl_display_output_types_t Type;   ///< [out] Device Type from display HW standpoint
+                                                      ///< 若有 protocol converter，此欄會是 DisplayPort，
+                                                      ///< 真正輸出格式由 ProtocolConverterOutput 提供。
+
+            [MarshalAs(UnmanagedType.I1)]
+            public bool IsOnBoardProtocolConverterOutputPresent;
+
+            public CtlRevisionDatatype SupportedSpec;
+
+            public ctl_output_bpc_flags_t SupportedOutputBPCFlags;
+            public ctl_encoder_config_flags_t EncoderConfigFlags;
+
+            /// <summary>[out] Adapter 支援的標準顯示功能</summary>
+            public ctl_std_display_feature_flags_t FeatureSupportedFlags;
+
+            /// <summary>[out] Adapter 支援的 Intel 進階顯示功能</summary>
+            public ctl_intel_display_feature_flags_t AdvancedFeatureSupportedFlags;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+            public uint[] ReservedFields;
+
+            // ----------------------------
+            // Helper properties（如同 Nvidia struct）
+            // ----------------------------
+
+            // BPC 支援
+            public bool Supports6Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_6BPC);
+            public bool Supports8Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_8BPC);
+            public bool Supports10Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_10BPC);
+            public bool Supports12Bpc => SupportedOutputBPCFlags.HasFlag(ctl_output_bpc_flags_t.CTL_OUTPUT_BPC_FLAG_12BPC);
+
+            // Encoder Config
+            public bool IsInternalDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_INTERNAL_DISPLAY);
+            public bool IsVesaTiledDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_VESA_TILED_DISPLAY);
+            public bool IsTypeCCapable => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_TYPEC_CAPABLE);
+            public bool IsTbtCapable => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_TBT_CAPABLE);
+            public bool IsVirtualDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_VIRTUAL_DISPLAY);
+            public bool IsHiddenDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_HIDDEN_DISPLAY);
+            public bool IsCollageDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_COLLAGE_DISPLAY);
+            public bool IsSplitDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_SPLIT_DISPLAY);
+            public bool IsCompanionDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_COMPANION_DISPLAY);
+            public bool IsMgpuCollageDisplay => EncoderConfigFlags.HasFlag(ctl_encoder_config_flags_t.CTL_ENCODER_CONFIG_FLAG_MGPU_COLLAGE_DISPLAY);
+
+            // 支援的標準功能
+            public bool SupportsHdcp => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDCP);
+            public bool SupportsHdr => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDR);
+            public bool SupportsAdaptiveSyncVrr => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_ADAPTIVESYNC_VRR);
+            public bool SupportsHdmiQms => FeatureSupportedFlags.HasFlag(ctl_std_display_feature_flags_t.CTL_STD_DISPLAY_FEATURE_FLAG_HDMI_QMS);
+
+            // 支援的 Intel 進階功能
+            public bool SupportsDpst => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DPST);
+            public bool SupportsLace => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_LACE);
+            public bool SupportsDrrs => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_DRRS);
+            public bool SupportsArcAdaptiveSyncCertified => AdvancedFeatureSupportedFlags.HasFlag(ctl_intel_display_feature_flags_t.CTL_INTEL_DISPLAY_FEATURE_FLAG_ARC_ADAPTIVE_SYNC_CERTIFIED);
+
+            public bool IsDisplayPort => Type == ctl_display_output_types_t.CTL_DISPLAY_OUTPUT_TYPES_DISPLAYPORT;
+            public bool IsHdmi => Type == ctl_display_output_types_t.CTL_DISPLAY_OUTPUT_TYPES_HDMI;
         }
 
 
-        private static class NativeMethods
+    private static class NativeMethods
         {
             private const string DllName = "ControlLib.dll";
 
@@ -1088,6 +1356,10 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             public static extern uint ctlGetDisplayProperties(
                 IntPtr outputHandle,
                 ref CtlDisplayProperties props);
+            [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
+            public static extern uint ctlGetAdaperDisplayEncoderProperties(
+                IntPtr outputHandle,
+                ref CtlDisplayEncoderProperties DisplayEncoderProperties);
 
             [DllImport(DllName, CallingConvention = CallingConvention.StdCall)]
             public static extern uint ctlAUXAccess(

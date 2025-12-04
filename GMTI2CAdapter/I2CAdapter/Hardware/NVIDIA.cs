@@ -17,6 +17,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private NvAPI_InitializeDelegate _nvInitialize = null!;
         private NvAPI_EnumPhysicalGPUsDelegate _nvEnumPhysicalGPUs = null!;
         private NvAPI_EnumNvidiaDisplayHandleDelegate _nvEnumNvidiaDisplayHandle = null!;
+        private NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate _nvEnummNvidiaUnAttachedDisplayHandle = null!;
         private NvAPI_GetAssociatedDisplayOutputIdDelegate _nvGetAssociatedDisplayOutputId = null!;
         private NvAPI_GetAssociatedNvidiaDisplayHandleDelegate _nvGetAssociatedNvidiaDisplayHandle = null!;
         private NvAPI_GetDisplayPortInfoDelegate _nvGetDisplayPortInfo = null!;
@@ -30,9 +31,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         private const uint Qi_Initialize = 0x0150E828;
         private const uint Qi_EnumPhysicalGPUs = 0xE5AC921F;
+        private const uint Qi_NvAPI_GPU_GetConnectedOutputs = 0x1730BFC9;
+        private const uint Qi_NvAPI_EnumNvidiaUnAttachedDisplayHandle = 0x20DE9260;
         private const uint Qi_EnumNvidiaDisplayHandle = 0x9ABDD40D;
         private const uint Qi_GetAssociatedDisplayOutputID = 0xD995937E;
-        private const uint Qi_GetAssociatedNvidiaDisplayHandle = 0x9E4B6097;
+        private const uint Qi_GetAssociatedNvidiaDisplayHandle = 0x35C29134;
         private const uint Qi_GetDisplayPortInfo = 0xC64FF367;
         private const uint Qi_GetErrorMessage = 0x6C2D048C;
         private const uint Qi_Disp_DpAuxChannelControl = 0x8EB56969;
@@ -128,7 +131,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         {
             EnsureNotDisposed();
 
-            if (_nvEnumNvidiaDisplayHandle == null ||
+            if (
                 _nvGetAssociatedDisplayOutputId == null ||
                 _nvGetDisplayPortInfo == null)
             {
@@ -137,11 +140,10 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             var list = new List<I2CAdapterInfo>();
             uint index = 0;
-
-            while (true)
+            while (_nvEnumNvidiaDisplayHandle != null)
             {
                 IntPtr handle;
-                int status = _nvEnumNvidiaDisplayHandle(index, out handle);
+                var status = _nvEnumNvidiaDisplayHandle(index, out handle);
 
                 if (status == NvapiStatusEndEnumeration)
                     break;
@@ -163,8 +165,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                     continue;
                 }
 
-                var info = CreateDpInfo();
-                status = _nvGetDisplayPortInfo(handle, outputId, ref info);
+                var infov1 = new NV_DISPLAY_PORT_INFO_V1
+                {
+                    version = NvApiVersion.NV_DISPLAY_PORT_INFO_VER1
+                };
+                status = _nvGetDisplayPortInfo(handle, outputId, ref infov1);
                 if (status != NvapiStatusOk)
                 {
                     index++;
@@ -172,7 +177,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 }
 
                 // Flags 的最低位表示該 DP output 是否啟用
-                if ((info.Flags & 1) == 0)
+                if (!infov1.IsDp)
                 {
                     index++;
                     continue;
@@ -548,6 +553,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             NvAPI_GetErrorMessageDelegate? nvGetErrorMessage;
             NvAPI_Disp_DpAuxChannelControlDelegate? nvDispDpAuxChannelControl;
             NvAPI_UnloadDelegate? nvUnload;
+            NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate? nvEnumNvidiaUnAttachedDisplayHandle;
 
             try
             {
@@ -560,6 +566,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
                 nvDispDpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
                 nvUnload = GetProc<NvAPI_UnloadDelegate>(Qi_NvUnload);
+                nvEnumNvidiaUnAttachedDisplayHandle = GetProc<NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate>(Qi_NvAPI_EnumNvidiaUnAttachedDisplayHandle);
             }
             catch (DllNotFoundException ex)
             {
@@ -569,6 +576,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             if (nvInitialize == null ||
                 nvEnumPhysicalGPUs == null ||
                 nvEnumNvidiaDisplayHandle == null ||
+                //nvEnumNvidiaUnAttachedDisplayHandle == null ||
                 nvGetAssociatedDisplayOutputId == null ||
                 nvGetAssociatedNvidiaDisplayHandle == null ||
                 nvGetDisplayPortInfo == null ||
@@ -587,6 +595,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             _nvGetErrorMessage = nvGetErrorMessage;
             _nvDisp_DpAuxChannelControl = nvDispDpAuxChannelControl;
             _nvUnload = nvUnload;
+            _nvEnummNvidiaUnAttachedDisplayHandle = nvEnumNvidiaUnAttachedDisplayHandle;
 
             int status = _nvInitialize();
             if (status != NvapiStatusOk)
@@ -755,15 +764,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             return (T)(object)Marshal.GetDelegateForFunctionPointer(ptr, typeof(T));
         }
 
-        private static NvDPInfoV1 CreateDpInfo()
-        {
-            return new NvDPInfoV1
-            {
-                Version = NvDPInfoV1Version,
-                Reserved0 = new byte[36],
-                Pad = new byte[3]
-            };
-        }
 
         private static NvDpAuxParamsV1 CreateAuxParams()
         {
@@ -806,6 +806,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             out IntPtr displayHandle);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate(
+            uint thisEnum,
+            out IntPtr displayHandle);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int NvAPI_GetAssociatedDisplayOutputIdDelegate(
             IntPtr displayHandle,
             ref uint outputId);
@@ -819,7 +824,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private delegate int NvAPI_GetDisplayPortInfoDelegate(
             IntPtr displayHandle,
             uint outputId,
-            ref NvDPInfoV1 info);
+            ref NV_DISPLAY_PORT_INFO_V1 info);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int NvAPI_GetErrorMessageDelegate(
@@ -834,20 +839,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int NvAPI_UnloadDelegate();
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct NvDPInfoV1
-        {
-            public uint Version;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 36)]
-            public byte[] Reserved0;
-
-            public byte Flags;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public byte[] Pad;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct NvDpAuxParamsV1
@@ -868,7 +859,150 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 48)]
             public byte[] Reserved1;
         }
+        public enum NV_DP_LINK_RATE : uint
+        {
+            NV_DP_1_62GBPS = 0x06,
+            NV_DP_2_70GBPS = 0x0A,
+            NV_DP_5_40GBPS = 0x14,
+            NV_DP_8_10GBPS = 0x1E,
+            NV_EDP_2_16GBPS = 0x08,
+            NV_EDP_2_43GBPS = 0x09,
+            NV_EDP_3_24GBPS = 0x0C,
+            NV_EDP_4_32GBPS = 0x10,
+        }
 
+        public enum NV_DP_LANE_COUNT : uint
+        {
+            NV_DP_1_LANE = 1,
+            NV_DP_2_LANE = 2,
+            NV_DP_4_LANE = 4,
+        }
+
+        public enum NV_DP_COLOR_FORMAT : uint
+        {
+            NV_DP_COLOR_FORMAT_RGB = 0,
+            NV_DP_COLOR_FORMAT_YCbCr422,
+            NV_DP_COLOR_FORMAT_YCbCr444,
+        }
+
+        public enum NV_DP_COLORIMETRY : uint
+        {
+            NV_DP_COLORIMETRY_RGB = 0,
+            NV_DP_COLORIMETRY_YCbCr_ITU601,
+            NV_DP_COLORIMETRY_YCbCr_ITU709,
+        }
+
+        public enum NV_DP_DYNAMIC_RANGE : uint
+        {
+            NV_DP_DYNAMIC_RANGE_VESA = 0,
+            NV_DP_DYNAMIC_RANGE_CEA,
+        }
+
+        public enum NV_DP_BPC : uint
+        {
+            NV_DP_BPC_DEFAULT = 0,
+            NV_DP_BPC_6,
+            NV_DP_BPC_8,
+            NV_DP_BPC_10,
+            NV_DP_BPC_12,
+            NV_DP_BPC_16,
+        }
+
+        // ----- struct -----
+
+        [StructLayout(LayoutKind.Sequential, Pack = 8)]
+        public struct NV_DISPLAY_PORT_INFO_V1
+        {
+            public uint version;
+            public uint dpcd_ver;
+            public NV_DP_LINK_RATE maxLinkRate;
+            public NV_DP_LANE_COUNT maxLaneCount;
+            public NV_DP_LINK_RATE curLinkRate;
+            public NV_DP_LANE_COUNT curLaneCount;
+            public NV_DP_COLOR_FORMAT colorFormat;
+            public NV_DP_DYNAMIC_RANGE dynamicRange;
+            public NV_DP_COLORIMETRY colorimetry;
+            public NV_DP_BPC bpc;
+
+            private uint _flags;
+
+            private const int BIT_isDp = 0;
+            private const int BIT_isInternalDp = 1;
+            private const int BIT_isColorCtrlSupported = 2;
+            private const int BIT_is6BPCSupported = 3;
+            private const int BIT_is8BPCSupported = 4;
+            private const int BIT_is10BPCSupported = 5;
+            private const int BIT_is12BPCSupported = 6;
+            private const int BIT_is16BPCSupported = 7;
+            private const int BIT_isYCrCb420Supported = 8;
+            private const int BIT_isYCrCb422Supported = 9;
+            private const int BIT_isYCrCb444Supported = 10;
+            private const int BIT_isRgb444SupportedOnCurrentMode = 11;
+            private const int BIT_isYCbCr444SupportedOnCurrentMode = 12;
+            private const int BIT_isYCbCr422SupportedOnCurrentMode = 13;
+            private const int BIT_isYCbCr420SupportedOnCurrentMode = 14;
+            private const int BIT_is6BPCSupportedOnCurrentMode = 15;
+            private const int BIT_is8BPCSupportedOnCurrentMode = 16;
+            private const int BIT_is10BPCSupportedOnCurrentMode = 17;
+            private const int BIT_is12BPCSupportedOnCurrentMode = 18;
+            private const int BIT_is16BPCSupportedOnCurrentMode = 19;
+            private const int BIT_isMonxvYCC601Capable = 20;
+            private const int BIT_isMonxvYCC709Capable = 21;
+            private const int BIT_isMonsYCC601Capable = 22;
+            private const int BIT_isMonAdobeYCC601Capable = 23;
+            private const int BIT_isMonAdobeRGBCapable = 24;
+            private const int BIT_isMonBT2020RGBCapable = 25;
+            private const int BIT_isMonBT2020YCCCapable = 26;
+            private const int BIT_isMonBT2020cYCCCapable = 27;
+
+            private bool GetFlag(int bit) => (_flags & (1u << bit)) != 0;
+            private void SetFlag(int bit, bool value)
+            {
+                if (value)
+                    _flags |= (1u << bit);
+                else
+                    _flags &= ~(1u << bit);
+            }
+
+            public bool IsDp { get => GetFlag(BIT_isDp); set => SetFlag(BIT_isDp, value); }
+            public bool IsInternalDp { get => GetFlag(BIT_isInternalDp); set => SetFlag(BIT_isInternalDp, value); }
+            public bool IsColorCtrlSupported { get => GetFlag(BIT_isColorCtrlSupported); set => SetFlag(BIT_isColorCtrlSupported, value); }
+            public bool Is6BPCSupported { get => GetFlag(BIT_is6BPCSupported); set => SetFlag(BIT_is6BPCSupported, value); }
+            public bool Is8BPCSupported { get => GetFlag(BIT_is8BPCSupported); set => SetFlag(BIT_is8BPCSupported, value); }
+            public bool Is10BPCSupported { get => GetFlag(BIT_is10BPCSupported); set => SetFlag(BIT_is10BPCSupported, value); }
+            public bool Is12BPCSupported { get => GetFlag(BIT_is12BPCSupported); set => SetFlag(BIT_is12BPCSupported, value); }
+            public bool Is16BPCSupported { get => GetFlag(BIT_is16BPCSupported); set => SetFlag(BIT_is16BPCSupported, value); }
+            public bool IsYCrCb420Supported { get => GetFlag(BIT_isYCrCb420Supported); set => SetFlag(BIT_isYCrCb420Supported, value); }
+            public bool IsYCrCb422Supported { get => GetFlag(BIT_isYCrCb422Supported); set => SetFlag(BIT_isYCrCb422Supported, value); }
+            public bool IsYCrCb444Supported { get => GetFlag(BIT_isYCrCb444Supported); set => SetFlag(BIT_isYCrCb444Supported, value); }
+            public bool IsRgb444SupportedOnCurrentMode { get => GetFlag(BIT_isRgb444SupportedOnCurrentMode); set => SetFlag(BIT_isRgb444SupportedOnCurrentMode, value); }
+            public bool IsYCbCr444SupportedOnCurrentMode { get => GetFlag(BIT_isYCbCr444SupportedOnCurrentMode); set => SetFlag(BIT_isYCbCr444SupportedOnCurrentMode, value); }
+            public bool IsYCbCr422SupportedOnCurrentMode { get => GetFlag(BIT_isYCbCr422SupportedOnCurrentMode); set => SetFlag(BIT_isYCbCr422SupportedOnCurrentMode, value); }
+            public bool IsYCbCr420SupportedOnCurrentMode { get => GetFlag(BIT_isYCbCr420SupportedOnCurrentMode); set => SetFlag(BIT_isYCbCr420SupportedOnCurrentMode, value); }
+            public bool Is6BPCSupportedOnCurrentMode { get => GetFlag(BIT_is6BPCSupportedOnCurrentMode); set => SetFlag(BIT_is6BPCSupportedOnCurrentMode, value); }
+            public bool Is8BPCSupportedOnCurrentMode { get => GetFlag(BIT_is8BPCSupportedOnCurrentMode); set => SetFlag(BIT_is8BPCSupportedOnCurrentMode, value); }
+            public bool Is10BPCSupportedOnCurrentMode { get => GetFlag(BIT_is10BPCSupportedOnCurrentMode); set => SetFlag(BIT_is10BPCSupportedOnCurrentMode, value); }
+            public bool Is12BPCSupportedOnCurrentMode { get => GetFlag(BIT_is12BPCSupportedOnCurrentMode); set => SetFlag(BIT_is12BPCSupportedOnCurrentMode, value); }
+            public bool Is16BPCSupportedOnCurrentMode { get => GetFlag(BIT_is16BPCSupportedOnCurrentMode); set => SetFlag(BIT_is16BPCSupportedOnCurrentMode, value); }
+            public bool IsMonxvYCC601Capable { get => GetFlag(BIT_isMonxvYCC601Capable); set => SetFlag(BIT_isMonxvYCC601Capable, value); }
+            public bool IsMonxvYCC709Capable { get => GetFlag(BIT_isMonxvYCC709Capable); set => SetFlag(BIT_isMonxvYCC709Capable, value); }
+            public bool IsMonsYCC601Capable { get => GetFlag(BIT_isMonsYCC601Capable); set => SetFlag(BIT_isMonsYCC601Capable, value); }
+            public bool IsMonAdobeYCC601Capable { get => GetFlag(BIT_isMonAdobeYCC601Capable); set => SetFlag(BIT_isMonAdobeYCC601Capable, value); }
+            public bool IsMonAdobeRGBCapable { get => GetFlag(BIT_isMonAdobeRGBCapable); set => SetFlag(BIT_isMonAdobeRGBCapable, value); }
+            public bool IsMonBT2020RGBCapable { get => GetFlag(BIT_isMonBT2020RGBCapable); set => SetFlag(BIT_isMonBT2020RGBCapable, value); }
+            public bool IsMonBT2020YCCCapable { get => GetFlag(BIT_isMonBT2020YCCCapable); set => SetFlag(BIT_isMonBT2020YCCCapable, value); }
+            public bool IsMonBT2020cYCCCapable { get => GetFlag(BIT_isMonBT2020cYCCCapable); set => SetFlag(BIT_isMonBT2020cYCCCapable, value); }
+        }
+
+        public static class NvApiVersion
+        {
+            public static uint MAKE_NVAPI_VERSION<T>(int ver)
+                where T : struct
+                => (uint)(Marshal.SizeOf(typeof(T)) | (ver << 16));
+
+            public static readonly uint NV_DISPLAY_PORT_INFO_VER1 =
+                MAKE_NVAPI_VERSION<NV_DISPLAY_PORT_INFO_V1>(1);
+        }
         #endregion
     }
 }
