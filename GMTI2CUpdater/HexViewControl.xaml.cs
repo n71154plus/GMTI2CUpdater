@@ -244,7 +244,7 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(groupKey))
                 return;
 
-            string syncKey = groupKey;
+            string syncKey = groupKey!;
 
             if (Math.Abs(e.VerticalChange) < double.Epsilon)
                 return;
@@ -276,7 +276,7 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(key))
                 return;
 
-            string groupKey = key;
+            string groupKey = key!;
             _registeredGroupKey = groupKey;
 
             if (!_syncGroups.TryGetValue(groupKey, out var list))
@@ -302,7 +302,7 @@ namespace GMTI2CUpdater
             if (string.IsNullOrWhiteSpace(key))
                 return;
 
-            string groupKey = key;
+            string groupKey = key!;
 
             if (!_syncGroups.TryGetValue(groupKey, out var list))
                 return;
