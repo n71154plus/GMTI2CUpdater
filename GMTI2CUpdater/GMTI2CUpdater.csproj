@@ -15,9 +15,7 @@
     <Content Include="logo_32bit_transparent.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Scripts/TconUnlock/*.lua">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="Scripts/TconUnlock/*.lua" />
   </ItemGroup>
   <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
