@@ -22,6 +22,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private NvAPI_GetDisplayPortInfoDelegate _nvGetDisplayPortInfo = null!;
         private NvAPI_GetErrorMessageDelegate _nvGetErrorMessage = null!;
         private NvAPI_Disp_DpAuxChannelControlDelegate _nvDisp_DpAuxChannelControl = null!;
+        private NvAPI_UnloadDelegate? _nvUnload;
 
         private const int NvapiStatusOk = 0x00000000;
         private const int NvapiStatusEndEnumeration = unchecked((int)0xFFFFFFF9);
@@ -86,8 +87,18 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             _disposed = true;
 
-            // 一般來說讓 process 結束時 OS 自行清理即可。
-            // 如果要更完整，可以再加上 QueryInterface 取得 NvAPI_Unload。
+            try
+            {
+                int status = _nvUnload?.Invoke() ?? NvapiStatusOk;
+                if (status != NvapiStatusOk)
+                {
+                    // Dispose shouldn't throw in finalizer path; ignore unload errors.
+                }
+            }
+            catch (DllNotFoundException)
+            {
+                // nvapi64.dll may have been removed; ignore when disposing.
+            }
         }
 
         private void EnsureNotDisposed()
@@ -536,6 +547,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             NvAPI_GetDisplayPortInfoDelegate? nvGetDisplayPortInfo;
             NvAPI_GetErrorMessageDelegate? nvGetErrorMessage;
             NvAPI_Disp_DpAuxChannelControlDelegate? nvDispDpAuxChannelControl;
+            NvAPI_UnloadDelegate? nvUnload;
 
             try
             {
@@ -547,6 +559,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 nvGetDisplayPortInfo = GetProc<NvAPI_GetDisplayPortInfoDelegate>(Qi_GetDisplayPortInfo);
                 nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
                 nvDispDpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
+                nvUnload = GetProc<NvAPI_UnloadDelegate>(Qi_NvUnload);
             }
             catch (DllNotFoundException ex)
             {
@@ -573,6 +586,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             _nvGetDisplayPortInfo = nvGetDisplayPortInfo;
             _nvGetErrorMessage = nvGetErrorMessage;
             _nvDisp_DpAuxChannelControl = nvDispDpAuxChannelControl;
+            _nvUnload = nvUnload;
 
             int status = _nvInitialize();
             if (status != NvapiStatusOk)
@@ -817,6 +831,9 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             IntPtr displayHandle,
             ref NvDpAuxParamsV1 parameters,
             uint size);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int NvAPI_UnloadDelegate();
 
         [StructLayout(LayoutKind.Sequential)]
         private struct NvDPInfoV1
