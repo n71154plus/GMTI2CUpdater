@@ -15,15 +15,13 @@
     <Content Include="logo_32bit_transparent.ico" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Scripts/TconUnlock/*.lua" />
-  </ItemGroup>
-  <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
         <PackageReference Include="Costura.Fody" Version="6.0.0" PrivateAssets="all" />
-	<PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
-	<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
-	<PackageReference Include="MoonSharp" Version="2.0.0" />
-	<PackageReference Include="NCalcSync" Version="5.7.0" />
-	<PackageReference Include="HidSharp" Version="2.6.4" />
+        <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+        <PackageReference Include="NCalcSync" Version="5.7.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GMTI2CAdapter\GMTI2CAdapter.csproj" />
   </ItemGroup>
 </Project>
