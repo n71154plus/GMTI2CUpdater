@@ -5,17 +5,13 @@
     /// </summary>
     public sealed class IntelIGCLI2CAdapter : I2CAdapterBase
     {
-        /// <summary>
-        /// 底層 API 傳回的介面資訊，包含來源、權限等屬性。
-        /// </summary>
-        public I2CAdapterInfo AdapterInfo { get; }
+
 
         /// <summary>
         /// 以指定的介面描述初始化 Intel IGCL 介面實作。
         /// </summary>
         public IntelIGCLI2CAdapter(I2CAdapterInfo adapterInfo) : base(adapterInfo)
         {
-            AdapterInfo = adapterInfo;
         }
 
         /// <summary>
