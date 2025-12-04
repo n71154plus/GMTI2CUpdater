@@ -1,30 +1,5 @@
-﻿// Target: .NET Framework 4.8
-// Language: C#
-//
-// 這個類別是把你貼的 Golang NVAPI 範例，改寫成 C# 版本，
-// 結構與用法盡量貼近 IntelIGFX.IntelCui：
-//
-// using (var nv = new NvidiaNVAPI.NvidiaNvapi())
-// {
-//     var displays = nv.GetAvailableDisplays();
-//     if (displays.Length == 0)
-//         return;
-//
-//     var d = displays[0];
-//     var dpcd = nv.ReadDpcd(d, 0x0000, 16);
-//     nv.WriteDpcd(d, 0x0010, new byte[] { 0x01, 0x02 });
-// }
-//
-// 注意：
-// - 僅實作 DPCD（AUX）存取，I2C 尚未實作。
-// - 如果系統未安裝 NVIDIA 驅動或沒有實體 GPU，建構子會丟 InvalidOperationException。
-// - 需 x64 + nvapi64.dll 存在。
-
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {

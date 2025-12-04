@@ -1,7 +1,4 @@
-﻿using GMTI2CUpdater.I2CAdapter;
-using System;
-
-namespace GMTI2CUpdater.I2CAdapter
+﻿namespace GMTI2CUpdater.I2CAdapter
 {
     /// <summary>
     /// 對外統一的 I2C / AUX 介面。

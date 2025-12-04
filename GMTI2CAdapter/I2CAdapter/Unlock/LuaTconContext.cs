@@ -1,4 +1,3 @@
-using System;
 using MoonSharp.Interpreter;
 
 namespace GMTI2CUpdater.I2CAdapter.Unlock

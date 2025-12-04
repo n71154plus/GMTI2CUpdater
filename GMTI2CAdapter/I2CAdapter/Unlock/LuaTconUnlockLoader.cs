@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using MoonSharp.Interpreter;
 using MoonSharp.Interpreter.Loaders;
@@ -12,7 +8,7 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
     /// <summary>
     /// 負責從 Scripts/TconUnlock 資料夾載入 Lua 解鎖腳本，並包裝成解鎖物件。
     /// </summary>
-    internal class LuaTconUnlockLoader
+    public class LuaTconUnlockLoader
     {
         private readonly Assembly assembly;
         private readonly string resourcePrefix;

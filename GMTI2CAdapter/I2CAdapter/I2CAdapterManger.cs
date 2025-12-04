@@ -1,16 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace GMTI2CUpdater.I2CAdapter
+﻿namespace GMTI2CUpdater.I2CAdapter
 {
     /// <summary>
     /// 集中處理各家顯示卡 I2C 介面的列舉邏輯。
     /// </summary>
-    static class I2CAdapterManger
+    public static class I2CAdapterManger
     {
         /// <summary>
         /// 嘗試從 NVIDIA 與 Intel API 取得可用的顯示介面並組成清單。

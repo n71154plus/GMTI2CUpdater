@@ -1,8 +1,5 @@
 ﻿
-using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
@@ -261,8 +258,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                         {
                             MonitorUid = uidMonitor,
                             Name = $"Intel,裝置{i}營幕{indexMonitor}",
-                            IsFromDisplay = true ,
-                            IsNeedPrivilege = false ,
+                            IsFromDisplay = true,
+                            IsNeedPrivilege = false,
                         };
 
                         list.Add(info);

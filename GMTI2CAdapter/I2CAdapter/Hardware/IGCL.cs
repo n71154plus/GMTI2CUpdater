@@ -1,12 +1,6 @@
 ﻿// Target: .NET Framework 4.8
 // Language: C#
-using HidSharp.Reports.Units;
-using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Threading;
-using System.Windows.Documents;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
@@ -554,7 +548,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 DataSize = (uint)length,
                 Data = new byte[CtlAuxMaxDataSize]
             };
-            
+
             CtlResult r = (CtlResult)NativeMethods.ctlAUXAccess(SelectDisplay(display), ref args);
             if (r != CtlResultSuccess)
                 throw new InvalidOperationException(
