@@ -562,29 +562,40 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         {
             try
             {
-                _nvInitialize = GetProc<NvAPI_InitializeDelegate>(Qi_Initialize);
-                _nvEnumPhysicalGPUs = GetProc<NvAPI_EnumPhysicalGPUsDelegate>(Qi_EnumPhysicalGPUs);
-                _nvEnumNvidiaDisplayHandle = GetProc<NvAPI_EnumNvidiaDisplayHandleDelegate>(Qi_EnumNvidiaDisplayHandle);
-                _nvGetAssociatedDisplayOutputId = GetProc<NvAPI_GetAssociatedDisplayOutputIdDelegate>(Qi_GetAssociatedDisplayOutputID);
-                _nvGetAssociatedNvidiaDisplayHandle = GetProc<NvAPI_GetAssociatedNvidiaDisplayHandleDelegate>(Qi_GetAssociatedNvidiaDisplayHandle);
-                _nvGetDisplayPortInfo = GetProc<NvAPI_GetDisplayPortInfoDelegate>(Qi_GetDisplayPortInfo);
-                _nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
-                _nvDisp_DpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
+                var nvInitialize = GetProc<NvAPI_InitializeDelegate>(Qi_Initialize);
+                var nvEnumPhysicalGPUs = GetProc<NvAPI_EnumPhysicalGPUsDelegate>(Qi_EnumPhysicalGPUs);
+                var nvEnumNvidiaDisplayHandle = GetProc<NvAPI_EnumNvidiaDisplayHandleDelegate>(Qi_EnumNvidiaDisplayHandle);
+                var nvGetAssociatedDisplayOutputId = GetProc<NvAPI_GetAssociatedDisplayOutputIdDelegate>(Qi_GetAssociatedDisplayOutputID);
+                var nvGetAssociatedNvidiaDisplayHandle = GetProc<NvAPI_GetAssociatedNvidiaDisplayHandleDelegate>(Qi_GetAssociatedNvidiaDisplayHandle);
+                var nvGetDisplayPortInfo = GetProc<NvAPI_GetDisplayPortInfoDelegate>(Qi_GetDisplayPortInfo);
+                var nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
+                var nvDispDpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
             }
             catch (DllNotFoundException ex)
             {
                 throw new InvalidOperationException("NVIDIA NVAPI: nvapi64.dll not found.", ex);
             }
 
-            if (_nvInitialize == null ||
-                _nvEnumPhysicalGPUs == null ||
-                _nvEnumNvidiaDisplayHandle == null ||
-                _nvGetAssociatedDisplayOutputId == null ||
-                _nvGetDisplayPortInfo == null ||
-                _nvDisp_DpAuxChannelControl == null)
+            if (nvInitialize == null ||
+                nvEnumPhysicalGPUs == null ||
+                nvEnumNvidiaDisplayHandle == null ||
+                nvGetAssociatedDisplayOutputId == null ||
+                nvGetAssociatedNvidiaDisplayHandle == null ||
+                nvGetDisplayPortInfo == null ||
+                nvGetErrorMessage == null ||
+                nvDispDpAuxChannelControl == null)
             {
                 throw new InvalidOperationException("NVIDIA NVAPI: required entry points are missing.");
             }
+
+            _nvInitialize = nvInitialize;
+            _nvEnumPhysicalGPUs = nvEnumPhysicalGPUs;
+            _nvEnumNvidiaDisplayHandle = nvEnumNvidiaDisplayHandle;
+            _nvGetAssociatedDisplayOutputId = nvGetAssociatedDisplayOutputId;
+            _nvGetAssociatedNvidiaDisplayHandle = nvGetAssociatedNvidiaDisplayHandle;
+            _nvGetDisplayPortInfo = nvGetDisplayPortInfo;
+            _nvGetErrorMessage = nvGetErrorMessage;
+            _nvDisp_DpAuxChannelControl = nvDispDpAuxChannelControl;
 
             int status = _nvInitialize();
             if (status != NvapiStatusOk)
