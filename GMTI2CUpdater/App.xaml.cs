@@ -13,7 +13,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 單例監視器服務，用來偵測螢幕變化並通知 ViewModel 重新整理可用的顯示介面。
         /// </summary>
-        private MonitorService _monitorService;
+        private MonitorService? _monitorService;
 
         protected override void OnStartup(StartupEventArgs e)
         {
