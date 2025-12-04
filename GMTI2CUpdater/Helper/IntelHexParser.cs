@@ -51,8 +51,6 @@ namespace GMTI2CUpdater
             int upperLinearBase = 0;   // type 04: upper 16 bits << 16
             int upperSegmentBase = 0;  // type 02: upper 16 bits << 4
             bool useLinear = false;
-            bool eofSeen = false;
-
             int lineNumber = 0;
 
             foreach (var rawLine in lines)

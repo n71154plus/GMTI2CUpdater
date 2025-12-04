@@ -27,9 +27,9 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private IntPtr _cuiPtr = IntPtr.Zero;
 
         // vtable delegate
-        private EnumAttachableDevicesDelegate _enumAttachableDevices;
-        private GetDeviceDataDelegate _getDeviceData;
-        private SetDeviceDataDelegate _setDeviceData;
+        private EnumAttachableDevicesDelegate _enumAttachableDevices = null!;
+        private GetDeviceDataDelegate _getDeviceData = null!;
+        private SetDeviceDataDelegate _setDeviceData = null!;
 
         // COM 是否由此物件呼叫 CoInitialize
         private bool _coInitialized;
@@ -169,9 +169,9 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 _cuiPtr = IntPtr.Zero;
             }
 
-            _enumAttachableDevices = null;
-            _getDeviceData = null;
-            _setDeviceData = null;
+            _enumAttachableDevices = null!;
+            _getDeviceData = null!;
+            _setDeviceData = null!;
 
             if (_coInitialized)
             {
@@ -840,7 +840,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         private static string AuxError(string op, int hr, int code)
         {
-            string msg;
+            string msg = string.Empty;
 
             switch (code)
             {
@@ -849,7 +849,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 case 69: msg = "Invalid AUX data size"; break;
                 case 70: msg = "AUX defer"; break;
                 case 71: msg = "AUX timeout"; break;
-                case 0: msg = null; break;
+                case 0: msg = string.Empty; break;
                 default:
                     msg = "AUX unknown error (" + code + ")";
                     break;

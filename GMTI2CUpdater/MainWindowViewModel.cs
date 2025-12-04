@@ -324,7 +324,7 @@ namespace GMTI2CUpdater
         {
             return (FormatRange(BaseAddress, data?.Length ?? 0), CalculateChecksum(data, definedMap));
         }
-        partial void OnSelectedAdapterChanged(I2CAdapterBase value)
+        partial void OnSelectedAdapterChanged(I2CAdapterBase? value)
         {
             UpdateAdviceNeedAdmin();
             UpdateUnlockTcon();
@@ -717,6 +717,11 @@ namespace GMTI2CUpdater
         /// </summary>
         private void GenerateTargetFromBeforeCore()
         {
+            if (BeforeData == null)
+            {
+                Log("產生 Target 失敗：尚未有 BeforeData，請先讀取來源資料。");
+                return;
+            }
 
             var size = BeforeData.Length;
             var target = new byte[size];

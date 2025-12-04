@@ -40,14 +40,14 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private bool _disposed;
 
         // NVAPI function delegates
-        private NvAPI_InitializeDelegate _nvInitialize;
-        private NvAPI_EnumPhysicalGPUsDelegate _nvEnumPhysicalGPUs;
-        private NvAPI_EnumNvidiaDisplayHandleDelegate _nvEnumNvidiaDisplayHandle;
-        private NvAPI_GetAssociatedDisplayOutputIdDelegate _nvGetAssociatedDisplayOutputId;
-        private NvAPI_GetAssociatedNvidiaDisplayHandleDelegate _nvGetAssociatedNvidiaDisplayHandle;
-        private NvAPI_GetDisplayPortInfoDelegate _nvGetDisplayPortInfo;
-        private NvAPI_GetErrorMessageDelegate _nvGetErrorMessage;
-        private NvAPI_Disp_DpAuxChannelControlDelegate _nvDisp_DpAuxChannelControl;
+        private NvAPI_InitializeDelegate _nvInitialize = null!;
+        private NvAPI_EnumPhysicalGPUsDelegate _nvEnumPhysicalGPUs = null!;
+        private NvAPI_EnumNvidiaDisplayHandleDelegate _nvEnumNvidiaDisplayHandle = null!;
+        private NvAPI_GetAssociatedDisplayOutputIdDelegate _nvGetAssociatedDisplayOutputId = null!;
+        private NvAPI_GetAssociatedNvidiaDisplayHandleDelegate _nvGetAssociatedNvidiaDisplayHandle = null!;
+        private NvAPI_GetDisplayPortInfoDelegate _nvGetDisplayPortInfo = null!;
+        private NvAPI_GetErrorMessageDelegate _nvGetErrorMessage = null!;
+        private NvAPI_Disp_DpAuxChannelControlDelegate _nvDisp_DpAuxChannelControl = null!;
 
         // 狀態碼（與 Golang 範例一致）
         private const int NvapiStatusOk = 0x00000000;
@@ -715,9 +715,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         private Exception StatusError(int status, string context)
         {
-            if (status == NvapiStatusOk)
-                return null;
-
             string message = string.Format("status 0x{0:X8}", (uint)status);
 
             if (_nvGetErrorMessage != null)
