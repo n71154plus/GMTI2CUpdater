@@ -6,6 +6,9 @@ using System.Windows.Controls;
 
 namespace GMTI2CUpdater
 {
+    /// <summary>
+    /// 以可捲動十六進位檢視呈現 byte 陣列，並支援多個控制項之間的同步捲動與差異顯示。
+    /// </summary>
     public partial class HexViewControl : UserControl
     {
         private const int BytesPerLine = 16;
@@ -19,6 +22,9 @@ namespace GMTI2CUpdater
         private static readonly Dictionary<string, List<WeakReference<HexViewControl>>> _syncGroups
             = new();
 
+        /// <summary>
+        /// 建構控制項，準備欄位標題與行集合並訂閱載入/卸載事件。
+        /// </summary>
         public HexViewControl()
         {
             InitializeComponent();
@@ -223,6 +229,9 @@ namespace GMTI2CUpdater
 
         #region 捲動同步
 
+        /// <summary>
+        /// 當其中一個控制項捲動時觸發，將捲動位置同步到同群組的其他控制項。
+        /// </summary>
         private void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
             if (_isInternalScrollChange)
@@ -240,6 +249,9 @@ namespace GMTI2CUpdater
             SyncGroupScroll(_registeredGroupKey, this, e.VerticalOffset);
         }
 
+        /// <summary>
+        /// 處理 SyncScrollKey 變更時的註冊與取消註冊邏輯。
+        /// </summary>
         private void UpdateSyncRegistration(string oldKey, string newKey)
         {
             if (!string.IsNullOrWhiteSpace(oldKey))
@@ -253,6 +265,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 將控制項加入指定的同步群組，避免重複加入相同實例。
+        /// </summary>
         private void RegisterToGroup(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -275,6 +290,9 @@ namespace GMTI2CUpdater
             list.Add(new WeakReference<HexViewControl>(this));
         }
 
+        /// <summary>
+        /// 從同步群組移除控制項，並在群組為空時清理集合。
+        /// </summary>
         private void UnregisterFromGroup(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -296,6 +314,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 將指定群組內其他控制項的捲動位置更新到同樣的偏移量。
+        /// </summary>
         private static void SyncGroupScroll(string key, HexViewControl sender, double verticalOffset)
         {
             if (!_syncGroups.TryGetValue(key, out var list))
@@ -335,6 +356,9 @@ namespace GMTI2CUpdater
 
         #region 行資料生成
 
+        /// <summary>
+        /// 根據 Data 與差異設定重新建立行與位元組的 ViewModel 集合。
+        /// </summary>
         private void RebuildLines()
         {
             Lines.Clear();

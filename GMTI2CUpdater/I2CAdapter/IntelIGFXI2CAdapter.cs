@@ -60,6 +60,9 @@
             igfx.WriteI2CWithoutIndex(AdapterInfo, address, data);
         }
 
+        /// <summary>
+        /// 透過短暫建立硬體 API 物件完成工作，因此本身無需釋放資源。
+        /// </summary>
         public override void Dispose()
         {
             throw new NotImplementedException();

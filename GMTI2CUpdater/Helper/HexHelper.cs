@@ -4,11 +4,15 @@ using System.Globalization;
 
 namespace GMTI2CUpdater.Helper
 {
-    using System;
-    using System.Globalization;
-
+    /// <summary>
+    /// 提供十六進位解析相關的簡易工具函式。
+    /// </summary>
     public static class HexHelper
     {
+        /// <summary>
+        /// 嘗試將傳入字串視為十六進位格式並轉換為 byte，失敗時回傳 null。
+        /// </summary>
+        /// <param name="s">可能含有 0x 前綴的十六進位文字。</param>
         public static byte? ParseHexByteOrNull(string s)
         {
             if (string.IsNullOrWhiteSpace(s))

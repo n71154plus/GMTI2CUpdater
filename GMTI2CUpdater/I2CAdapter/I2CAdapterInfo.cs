@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GMTI2CUpdater.I2CAdapter
 {
+    /// <summary>
+    /// 描述可用 I2C / AUX 介面的基本資訊與來源屬性。
+    /// </summary>
     public class I2CAdapterInfo
     {
         public string? Name { get; set; }
