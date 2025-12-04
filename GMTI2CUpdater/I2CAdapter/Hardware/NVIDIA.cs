@@ -560,31 +560,51 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
         private void InitializeNvapi()
         {
+            NvAPI_InitializeDelegate? nvInitialize;
+            NvAPI_EnumPhysicalGPUsDelegate? nvEnumPhysicalGPUs;
+            NvAPI_EnumNvidiaDisplayHandleDelegate? nvEnumNvidiaDisplayHandle;
+            NvAPI_GetAssociatedDisplayOutputIdDelegate? nvGetAssociatedDisplayOutputId;
+            NvAPI_GetAssociatedNvidiaDisplayHandleDelegate? nvGetAssociatedNvidiaDisplayHandle;
+            NvAPI_GetDisplayPortInfoDelegate? nvGetDisplayPortInfo;
+            NvAPI_GetErrorMessageDelegate? nvGetErrorMessage;
+            NvAPI_Disp_DpAuxChannelControlDelegate? nvDispDpAuxChannelControl;
+
             try
             {
-                _nvInitialize = GetProc<NvAPI_InitializeDelegate>(Qi_Initialize);
-                _nvEnumPhysicalGPUs = GetProc<NvAPI_EnumPhysicalGPUsDelegate>(Qi_EnumPhysicalGPUs);
-                _nvEnumNvidiaDisplayHandle = GetProc<NvAPI_EnumNvidiaDisplayHandleDelegate>(Qi_EnumNvidiaDisplayHandle);
-                _nvGetAssociatedDisplayOutputId = GetProc<NvAPI_GetAssociatedDisplayOutputIdDelegate>(Qi_GetAssociatedDisplayOutputID);
-                _nvGetAssociatedNvidiaDisplayHandle = GetProc<NvAPI_GetAssociatedNvidiaDisplayHandleDelegate>(Qi_GetAssociatedNvidiaDisplayHandle);
-                _nvGetDisplayPortInfo = GetProc<NvAPI_GetDisplayPortInfoDelegate>(Qi_GetDisplayPortInfo);
-                _nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
-                _nvDisp_DpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
+                nvInitialize = GetProc<NvAPI_InitializeDelegate>(Qi_Initialize);
+                nvEnumPhysicalGPUs = GetProc<NvAPI_EnumPhysicalGPUsDelegate>(Qi_EnumPhysicalGPUs);
+                nvEnumNvidiaDisplayHandle = GetProc<NvAPI_EnumNvidiaDisplayHandleDelegate>(Qi_EnumNvidiaDisplayHandle);
+                nvGetAssociatedDisplayOutputId = GetProc<NvAPI_GetAssociatedDisplayOutputIdDelegate>(Qi_GetAssociatedDisplayOutputID);
+                nvGetAssociatedNvidiaDisplayHandle = GetProc<NvAPI_GetAssociatedNvidiaDisplayHandleDelegate>(Qi_GetAssociatedNvidiaDisplayHandle);
+                nvGetDisplayPortInfo = GetProc<NvAPI_GetDisplayPortInfoDelegate>(Qi_GetDisplayPortInfo);
+                nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
+                nvDispDpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
             }
             catch (DllNotFoundException ex)
             {
                 throw new InvalidOperationException("NVIDIA NVAPI: nvapi64.dll not found.", ex);
             }
 
-            if (_nvInitialize == null ||
-                _nvEnumPhysicalGPUs == null ||
-                _nvEnumNvidiaDisplayHandle == null ||
-                _nvGetAssociatedDisplayOutputId == null ||
-                _nvGetDisplayPortInfo == null ||
-                _nvDisp_DpAuxChannelControl == null)
+            if (nvInitialize == null ||
+                nvEnumPhysicalGPUs == null ||
+                nvEnumNvidiaDisplayHandle == null ||
+                nvGetAssociatedDisplayOutputId == null ||
+                nvGetAssociatedNvidiaDisplayHandle == null ||
+                nvGetDisplayPortInfo == null ||
+                nvGetErrorMessage == null ||
+                nvDispDpAuxChannelControl == null)
             {
                 throw new InvalidOperationException("NVIDIA NVAPI: required entry points are missing.");
             }
+
+            _nvInitialize = nvInitialize;
+            _nvEnumPhysicalGPUs = nvEnumPhysicalGPUs;
+            _nvEnumNvidiaDisplayHandle = nvEnumNvidiaDisplayHandle;
+            _nvGetAssociatedDisplayOutputId = nvGetAssociatedDisplayOutputId;
+            _nvGetAssociatedNvidiaDisplayHandle = nvGetAssociatedNvidiaDisplayHandle;
+            _nvGetDisplayPortInfo = nvGetDisplayPortInfo;
+            _nvGetErrorMessage = nvGetErrorMessage;
+            _nvDisp_DpAuxChannelControl = nvDispDpAuxChannelControl;
 
             int status = _nvInitialize();
             if (status != NvapiStatusOk)
