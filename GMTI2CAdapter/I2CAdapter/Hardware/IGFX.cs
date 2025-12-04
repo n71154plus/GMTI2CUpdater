@@ -257,7 +257,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                         var info = new I2CAdapterInfo
                         {
                             MonitorUid = uidMonitor,
-                            Name = $"Intel,裝置{i}營幕{indexMonitor}",
+                            Name = $"DisplayPort:Intel,Device{i},Display{indexMonitor}",
                             IsFromDisplay = true,
                             IsNeedPrivilege = false,
                         };

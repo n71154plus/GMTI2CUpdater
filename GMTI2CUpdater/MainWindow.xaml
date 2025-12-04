@@ -8,10 +8,12 @@
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
-        Title="Global Mixed Technology - I2C更新工具" Height="720" Width="1280">
+        Title="Global Mixed Technology - I2C更新工具"
+        Height="720"
+        Width="1280">
     <Window.Resources>
         <!-- 把 Converter 宣告成資源 -->
-        <local:ByteToHexConverter x:Key="ByteToHexConverter" />
+        <local:ByteToHexConverter x:Key="ByteToHexConverter"/>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -22,56 +24,83 @@
             <RowDefinition Height="Auto"/>
             <!-- Log / 狀態列 -->
         </Grid.RowDefinitions>
-        <Border Grid.Row="0" Padding="8" BorderThickness="0,0,0,1" BorderBrush="LightGray">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Border Grid.Row="0"
+                Padding="8"
+                BorderThickness="0,0,0,1"
+                BorderBrush="LightGray">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
                 <!-- I2C 設定 -->
-                <TextBlock Text="Adapter：" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                <ComboBox Width="Auto" ItemsSource="{Binding AdapterInfos}"
+                <TextBlock Text="Adapter："
+                           VerticalAlignment="Center"
+                           Margin="0,0,4,0"/>
+                <ComboBox Width="Auto"
+                          ItemsSource="{Binding AllAdapters}"
                           DisplayMemberPath="Name"
                           SelectedItem="{Binding SelectedAdapter}"/>
-                <TextBlock Text="需要系統管理員權限" VerticalAlignment="Center" Margin="2,0,0,0" Foreground="Red">
+                <TextBlock Text="需要系統管理員權限"
+                           VerticalAlignment="Center"
+                           Margin="2,0,0,0"
+                           Foreground="Red">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <!-- 預設不顯示 -->
-                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding AdviceNeedAdmin}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
+                                <DataTrigger Binding="{Binding AdviceNeedAdmin}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <TextBlock Text="選擇解鎖指令" VerticalAlignment="Center" Margin="2,0,0,0">
+                <TextBlock Text="選擇解鎖指令"
+                           VerticalAlignment="Center"
+                           Margin="2,0,0,0">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <!-- 預設不顯示 -->
-                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
+                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <ComboBox Width="Auto" ItemsSource="{Binding TCONUnlockBases}"
+                <ComboBox Width="Auto"
+                          ItemsSource="{Binding TCONUnlockBases}"
                           DisplayMemberPath="Name"
                           SelectedItem="{Binding SelectedAdaptertCONUnlock}">
                     <ComboBox.Style>
                         <Style TargetType="ComboBox">
                             <!-- 預設不顯示 -->
-                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
+                                <DataTrigger Binding="{Binding SelectedAdapter.AdapterInfo.IsFromDisplay}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </ComboBox.Style>
                 </ComboBox>
-                <TextBlock Text="Device Addr：" Margin="12,0,4,0" VerticalAlignment="Center"/>
-                <ComboBox Width="Auto" ItemsSource="{Binding DeviceAddressCollection}" SelectedItem="{Binding SelectedDeviceAddress}" ToolTip="使用8bit Byte表示">
+                <TextBlock Text="Device Addr："
+                           Margin="12,0,4,0"
+                           VerticalAlignment="Center"/>
+                <ComboBox Width="Auto"
+                          ItemsSource="{Binding DeviceAddressCollection}"
+                          SelectedItem="{Binding SelectedDeviceAddress}"
+                          ToolTip="使用8bit Byte表示">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <!-- 每個 item 顯示成 0x00 這種格式 -->
@@ -80,28 +109,42 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
 
-                <TextBlock Text="Total Size：" Margin="12,0,4,0" VerticalAlignment="Center"/>
-                <TextBlock Width="Auto" Text="{Binding TotalSize}" VerticalAlignment="Center" ToolTip="Total Bytes"/>
+                <TextBlock Text="Total Size："
+                           Margin="12,0,4,0"
+                           VerticalAlignment="Center"/>
+                <TextBlock Width="Auto"
+                           Text="{Binding TotalSize}"
+                           VerticalAlignment="Center"
+                           ToolTip="Total Bytes"/>
 
-                <Separator Margin="12,0" Width="1"/>
+                <Separator Margin="12,0"
+                           Width="1"/>
 
                 <!-- 主要操作按鈕 -->
-                <Button Content="1：載入欲更新資料(HEX)" Margin="4,0,0,0"
+                <Button Content="1：載入欲更新資料(HEX)"
+                        Margin="4,0,0,0"
                         Command="{Binding LoadHexCommand}"/>
-                <Button Content="2：讀取目前資料" Margin="8,0,0,0"
+                <Button Content="2：讀取目前資料"
+                        Margin="8,0,0,0"
                         Command="{Binding ReadBeforeCommand}"/>
-                <Button Content="3：開始更新" Margin="4,0,0,0"
+                <Button Content="3：開始更新"
+                        Margin="4,0,0,0"
                         Command="{Binding UpdateCommand}"/>
-                <Button Content="4：更新後回讀" Margin="4,0,0,0"
+                <Button Content="4：更新後回讀"
+                        Margin="4,0,0,0"
                         Command="{Binding ReadAfterCommand}"/>
-                <Button Content="5：燒錄" Margin="4,0,0,0"
+                <Button Content="5：燒錄"
+                        Margin="4,0,0,0"
                         Command="{Binding WriteEEPROMCommand}"/>
-                <Button Content="6：Apply(1~5)" Margin="4,0,0,0"
+                <Button Content="6：Apply(1~5)"
+                        Margin="4,0,0,0"
                         Command="{Binding ApplyAllCommand}"/>
             </StackPanel>
         </Border>
         <!-- Row 1: 三個 HexView -->
-        <Grid Grid.Row="1" Margin="8" MinHeight="300">
+        <Grid Grid.Row="1"
+              Margin="8"
+              MinHeight="300">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -109,7 +152,9 @@
             </Grid.ColumnDefinitions>
 
             <!-- 1. Before -->
-            <GroupBox Grid.Column="0" Header="1. 還未執行 Update 前的資料 (Before)" Margin="0,0,4,0">
+            <GroupBox Grid.Column="0"
+                      Header="1. 還未執行 Update 前的資料 (Before)"
+                      Margin="0,0,4,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -124,20 +169,35 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="Adapter：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedAdapter.Name}" Margin="4,0" Width="Auto"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="Adapter："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedAdapter.Name}"
+                                       Margin="4,0"
+                                       Width="Auto"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="CheckSum：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding BeforeChecksum}" Margin="0,0" Foreground="Blue"/>
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="CheckSum："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BeforeChecksum}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <TextBlock Text="範圍：" Margin="2,0,0,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding BeforeRangeText}" Margin="0,0" Foreground="Blue"/>
+                            <TextBlock Text="範圍："
+                                       Margin="2,0,0,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding BeforeRangeText}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <CheckBox Content="顯示與Target差異" Margin="2,0,0,0"
-                                  IsChecked="{Binding ShowDiffWithTarget}"/>
+                            <CheckBox Content="顯示與Target差異"
+                                      Margin="2,0,0,0"
+                                      IsChecked="{Binding ShowDiffWithTarget}"/>
                         </StackPanel>
                     </Grid>
 
@@ -154,7 +214,9 @@
             </GroupBox>
 
             <!-- 2. Target (載入 Intel HEX) -->
-            <GroupBox Grid.Column="1" Header="2. 我想要變更的資料 (Target / Intel HEX)" Margin="2,0,2,0">
+            <GroupBox Grid.Column="1"
+                      Header="2. 我想要變更的資料 (Target / Intel HEX)"
+                      Margin="2,0,2,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -169,20 +231,35 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="檔案：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding HexFileName}" Margin="4,0" Width="Auto"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="檔案："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding HexFileName}"
+                                       Margin="4,0"
+                                       Width="Auto"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="CheckSum：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding TargetChecksum}" Margin="0,0" Foreground="Blue"/>
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="CheckSum："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TargetChecksum}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <TextBlock Text="範圍：" Margin="2,0,0,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding TargetRangeText}" Margin="0,0" Foreground="Blue"/>
+                            <TextBlock Text="範圍："
+                                       Margin="2,0,0,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TargetRangeText}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <CheckBox Content="顯示與Before差異" Margin="2,0,0,0"
-                                  IsChecked="{Binding ShowDiffWithBefore}"/>
+                            <CheckBox Content="顯示與Before差異"
+                                      Margin="2,0,0,0"
+                                      IsChecked="{Binding ShowDiffWithBefore}"/>
                         </StackPanel>
                     </Grid>
                     <!-- HexView -->
@@ -198,7 +275,9 @@
             </GroupBox>
 
             <!-- 3. After -->
-            <GroupBox Grid.Column="2" Header="3. 執行 Update 後回讀的資料 (After)" Margin="4,0,0,0">
+            <GroupBox Grid.Column="2"
+                      Header="3. 執行 Update 後回讀的資料 (After)"
+                      Margin="4,0,0,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -213,20 +292,35 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="Adapter：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedAdapter.Name}" Margin="4,0" Width="Auto"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="Adapter："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedAdapter.Name}"
+                                       Margin="4,0"
+                                       Width="Auto"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4">
-                            <TextBlock Text="CheckSum：" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding AfterChecksum}" Margin="0,0" Foreground="Blue"/>
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Margin="4">
+                            <TextBlock Text="CheckSum："
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding AfterChecksum}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <TextBlock Text="範圍：" Margin="2,0,0,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding AfterRangeText}" Margin="0,0" Foreground="Blue"/>
+                            <TextBlock Text="範圍："
+                                       Margin="2,0,0,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding AfterRangeText}"
+                                       Margin="0,0"
+                                       Foreground="Blue"/>
 
-                            <CheckBox Content="顯示與Target差異" Margin="2,0,0,0"
-                                  IsChecked="{Binding ShowDiffWithTarget}"/>
+                            <CheckBox Content="顯示與Target差異"
+                                      Margin="2,0,0,0"
+                                      IsChecked="{Binding ShowDiffWithTarget}"/>
                         </StackPanel>
                     </Grid>
                     <!-- HexView -->
@@ -241,7 +335,8 @@
                 </Grid>
             </GroupBox>
         </Grid>
-        <Grid Grid.Row="2" MaxHeight="250">
+        <Grid Grid.Row="2"
+              MaxHeight="250">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <!-- Log -->
@@ -249,15 +344,20 @@
                 <!-- StatusBar -->
             </Grid.RowDefinitions>
 
-            <GroupBox Grid.Row="0" Header="操作記錄 (Log)" Margin="8,0,8,4">
+            <GroupBox Grid.Row="0"
+                      Header="操作記錄 (Log)"
+                      Margin="8,0,8,4">
                 <DockPanel>
-                    <Button Content="清除" DockPanel.Dock="Top" Margin="0,0,0,4"
+                    <Button Content="清除"
+                            DockPanel.Dock="Top"
+                            Margin="0,0,0,4"
                             Command="{Binding ClearLogCommand}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding LogItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" Margin="2,0"/>
+                                    <TextBlock Text="{Binding}"
+                                               Margin="2,0"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -269,9 +369,12 @@
                 <StatusBarItem Content="{Binding I2CStatusText}"/>
                 <StatusBarItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="進度：" Margin="0,0,4,0"/>
-                        <ProgressBar Width="150" Height="12"
-                                     Minimum="0" Maximum="100"
+                        <TextBlock Text="進度："
+                                   Margin="0,0,4,0"/>
+                        <ProgressBar Width="150"
+                                     Height="12"
+                                     Minimum="0"
+                                     Maximum="100"
                                      Value="{Binding Progress}"/>
                     </StackPanel>
                 </StatusBarItem>

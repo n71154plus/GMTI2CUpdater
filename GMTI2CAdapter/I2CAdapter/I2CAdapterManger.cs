@@ -5,6 +5,46 @@
     /// </summary>
     public static class I2CAdapterManger
     {
+        public static List<I2CAdapterBase> GetAvaiableI2CAdapter()
+        {
+            var list = new List<I2CAdapterBase>();
+            var usbi2clist = GetAvaiableUsbI2CAdapter();
+            var displaylist = GetAvailableDisplays();
+            list.AddRange(usbi2clist);
+            list.AddRange(displaylist);
+            return list;
+
+        }
+        public static List<I2CAdapterBase> GetAvaiableUsbI2CAdapter()
+        {
+            var list = new List<I2CAdapterBase>();
+            try
+            {
+                if (HidDevice.Exists(0x04B4, 0xF232))
+                {
+                    list.Add(new Cy8C24894Adapter(
+                        new I2CAdapterInfo
+                        {
+                            Name = "Usb I2C Adapter:CY8C24894",
+                            IsFromDisplay = false,
+                            IsNeedPrivilege = false,
+                        },
+                        0x04B4,
+                        0xF232
+                    ));
+
+                }
+
+            }
+            catch
+            {
+                //ignore Usb I2C Adapter:CY8C24894 Error
+            }
+            return list;
+        }
+
+
+
         /// <summary>
         /// 嘗試從 NVIDIA 與 Intel API 取得可用的顯示介面並組成清單。
         /// </summary>

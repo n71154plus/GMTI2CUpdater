@@ -430,7 +430,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                         //DisplayHandle = outHandle,
                         DeviceIndex = devIndex,
                         OutputIndex = outIndex,
-                        Name = $"Intel,裝置{devIndex}營幕{outIndex}",
+                        Name = $"DisplayPort:Intel,Device{devIndex},Display{outIndex}",
                         IsNeedPrivilege = true,
                         IsFromDisplay = true,
                     };

@@ -71,7 +71,7 @@ namespace GMTI2CUpdater
         [ObservableProperty] private string statusMessage = string.Empty;
         [ObservableProperty] private double progress;
 
-        [ObservableProperty] private List<I2CAdapterBase> adapterInfos = new();
+        [ObservableProperty] private List<I2CAdapterBase> allAdapters = new();
 
         // Log 集合本身用 ObservableCollection 即可
         public ObservableCollection<string> LogItems { get; } = new();
@@ -99,6 +99,7 @@ namespace GMTI2CUpdater
             StatusMessage = "Ready";
             Progress = 0;
             InitDeviceAddressCollection();
+            RefreshUsbAdapter();
             RefreshMonitor();
             LoadLastHexFromConfig();
         }
@@ -146,9 +147,25 @@ namespace GMTI2CUpdater
         /// </summary>
         private void RefreshMonitor()
         {
-            AdapterInfos = I2CAdapterManger.GetAvailableDisplays();
-            if (AdapterInfos.Count > 0)
-                SelectedAdapter = AdapterInfos[0];
+            List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvailableDisplays();
+            AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            SelectI2CAdapter();
+        }
+        private void RefreshUsbAdapter()
+        {
+            List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvaiableUsbI2CAdapter();
+            AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            SelectI2CAdapter();
+        }
+
+        private void SelectI2CAdapter()
+        {
+            if (AllAdapters != null && AllAdapters.Count > 0)
+            {
+                var seladapter = configFile.Get("Adapter", "Adapter", AllAdapters[0].Name);
+                SelectedAdapter = AllAdapters.FirstOrDefault(x => x.Name == seladapter);
+            }
+
         }
 
         private (byte? UnlockIndex, byte? UnlockCommand, byte? LockIndex, byte? LockCommand) ReadLockCommands()
@@ -527,11 +544,13 @@ namespace GMTI2CUpdater
             byte[]? targetData)
         {
             if (adapter == null) throw new ArgumentNullException(nameof(adapter));
-            if (beforeData == null){
+            if (beforeData == null)
+            {
                 Log("beforeData 為 null，無法進行差異寫入，請先讀取目前資料");
                 return;
             }
-            if (targetData == null) {
+            if (targetData == null)
+            {
                 Log("targetData 為 null，無法進行差異寫入，請先載入欲更新的資料");
                 return;
             }
@@ -684,7 +703,7 @@ namespace GMTI2CUpdater
             }
             else
             {
-                MessageBox.Show("Verify失敗，請確認Target與After資料一致後再進行燒錄","警告",MessageBoxButton.OK,MessageBoxImage.Warning);
+                MessageBox.Show("Verify失敗，請確認Target與After資料一致後再進行燒錄", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
 

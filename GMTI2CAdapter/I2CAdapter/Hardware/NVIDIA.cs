@@ -184,7 +184,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                     MonitorUid = outputId,
                     DeviceIndex = 0,
                     OutputIndex = (int)index,
-                    Name = $"Nvidia,裝置{0}營幕{index}",
+                    Name = $"DisplayPort:Nvidia,Device{0},Display{index}",
                     Description = "NVIDIA Display " + index,
                     IsNeedPrivilege = true,
                     IsFromDisplay = true,
