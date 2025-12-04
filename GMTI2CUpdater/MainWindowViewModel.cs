@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -410,11 +409,17 @@ namespace GMTI2CUpdater
                 return 0x00;
 
             // 自訂十六進位值
-            if (!string.IsNullOrWhiteSpace(CustomFillValue) &&
-                byte.TryParse(CustomFillValue.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
-                return b;
+            var customByte = HexHelper.ParseHexByteOrNull(CustomFillValue ?? string.Empty);
+            if (customByte.HasValue)
+            {
+                return customByte.Value;
+            }
 
             // fallback
+            if (!string.IsNullOrWhiteSpace(CustomFillValue))
+            {
+                Log($"自訂填充值 \"{CustomFillValue}\" 解析失敗，改用 0xFF。");
+            }
             return 0xFF;
         }
 
