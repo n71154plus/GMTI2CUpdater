@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
@@ -45,7 +46,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private const uint NvDPInfoV1Version = 0x10000u | NvDPInfoV1Size;
 
         // nvDpAuxParamsV1 version
-        private const uint NvDpAuxParamsV1Version = 0x00010028;
 
         private const uint DpAuxOpWriteDpcd = 0;
         private const uint DpAuxOpReadDpcd = 1;
@@ -553,7 +553,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             NvAPI_GetErrorMessageDelegate? nvGetErrorMessage;
             NvAPI_Disp_DpAuxChannelControlDelegate? nvDispDpAuxChannelControl;
             NvAPI_UnloadDelegate? nvUnload;
-            NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate? nvEnumNvidiaUnAttachedDisplayHandle;
 
             try
             {
@@ -566,7 +565,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 nvGetErrorMessage = GetProc<NvAPI_GetErrorMessageDelegate>(Qi_GetErrorMessage);
                 nvDispDpAuxChannelControl = GetProc<NvAPI_Disp_DpAuxChannelControlDelegate>(Qi_Disp_DpAuxChannelControl);
                 nvUnload = GetProc<NvAPI_UnloadDelegate>(Qi_NvUnload);
-                nvEnumNvidiaUnAttachedDisplayHandle = GetProc<NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate>(Qi_NvAPI_EnumNvidiaUnAttachedDisplayHandle);
             }
             catch (DllNotFoundException ex)
             {
@@ -576,7 +574,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             if (nvInitialize == null ||
                 nvEnumPhysicalGPUs == null ||
                 nvEnumNvidiaDisplayHandle == null ||
-                //nvEnumNvidiaUnAttachedDisplayHandle == null ||
                 nvGetAssociatedDisplayOutputId == null ||
                 nvGetAssociatedNvidiaDisplayHandle == null ||
                 nvGetDisplayPortInfo == null ||
@@ -595,8 +592,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             _nvGetErrorMessage = nvGetErrorMessage;
             _nvDisp_DpAuxChannelControl = nvDispDpAuxChannelControl;
             _nvUnload = nvUnload;
-            _nvEnummNvidiaUnAttachedDisplayHandle = nvEnumNvidiaUnAttachedDisplayHandle;
-
             int status = _nvInitialize();
             if (status != NvapiStatusOk)
                 throw StatusError(status, "NvAPI_Initialize");
@@ -769,16 +764,12 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         {
             return new NvDpAuxParamsV1
             {
-                Version = NvDpAuxParamsV1Version,
+                Version = NvApiVersion.NvDpAuxParamsV1,
                 OutputId = 0,
                 Op = 0,
                 Address = 0,
                 Buf = new byte[DpAuxMaxPayload],
                 LenMinus1 = 0,
-                Status = 0,
-                DataLo = 0,
-                DataHi = 0,
-                Reserved1 = new byte[48]
             };
         }
 
@@ -853,11 +844,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             public uint LenMinus1;
             public int Status;
-            public ulong DataLo;
-            public ulong DataHi;
+            //public ulong DataLo;
+            //public ulong DataHi;
 
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 48)]
-            public byte[] Reserved1;
+            //[MarshalAs(UnmanagedType.ByValArray, SizeConst = 48)]
+            //public byte[] Reserved1;
         }
         public enum NV_DP_LINK_RATE : uint
         {
@@ -1002,6 +993,9 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             public static readonly uint NV_DISPLAY_PORT_INFO_VER1 =
                 MAKE_NVAPI_VERSION<NV_DISPLAY_PORT_INFO_V1>(1);
+
+            public static readonly uint NvDpAuxParamsV1 =
+                MAKE_NVAPI_VERSION<NvDpAuxParamsV1>(1);
         }
         #endregion
     }
