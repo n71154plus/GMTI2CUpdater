@@ -4,6 +4,9 @@ using MoonSharp.Interpreter;
 namespace GMTI2CUpdater.I2CAdapter.Unlock
 {
     [MoonSharpUserData]
+    /// <summary>
+    /// 提供 Lua 腳本呼叫的橋接方法，封裝 I2C 與 DPCD 讀寫並處理型別轉換。
+    /// </summary>
     internal class LuaTconContext
     {
         private readonly Script script;
@@ -55,6 +58,9 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             adapter.WriteI2CWithoutIndex(address, data);
         }
 
+        /// <summary>
+        /// 允許 Lua 傳入數字或表格並轉換成 byte 陣列。
+        /// </summary>
         private byte[] ToByteArray(DynValue value)
         {
             return value.Type switch
@@ -65,6 +71,9 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             };
         }
 
+        /// <summary>
+        /// 將 Lua table 轉換為連續的 byte 陣列，並在遇到空值時回報錯誤。
+        /// </summary>
         private byte[] TableToBytes(Table table)
         {
             int length = (int)table.Length;
@@ -81,6 +90,9 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             return result;
         }
 
+        /// <summary>
+        /// 將 byte 陣列轉回 Lua table，索引從 1 起算以符合 Lua 習慣。
+        /// </summary>
         private Table BytesToTable(byte[] data)
         {
             var table = new Table(script);

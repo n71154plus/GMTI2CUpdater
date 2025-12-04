@@ -15,6 +15,9 @@ using System.Windows;
 
 namespace GMTI2CUpdater
 {
+    /// <summary>
+    /// 負責處理主畫面的所有狀態與命令，包含檔案載入、I2C 讀寫、比對與記錄等流程。
+    /// </summary>
     public partial class MainWindowViewModel : ObservableObject
     {
         private readonly LuaTconUnlockLoader luaTconUnlockLoader = new();
@@ -75,6 +78,9 @@ namespace GMTI2CUpdater
 
         private bool NeedsDisplayUnlock => SelectedAdapter?.AdapterInfo.IsFromDisplay == true;
 
+        /// <summary>
+        /// 建構子：初始化預設狀態、訂閱螢幕變化並讀取設定檔。
+        /// </summary>
         public MainWindowViewModel(MonitorService monitorSvc)
         {
             monitorSvc.MonitorChanged += OnMonitorChanged;
@@ -96,6 +102,10 @@ namespace GMTI2CUpdater
             RefreshMonitor();
             LoadLastHexFromConfig();
         }
+
+        /// <summary>
+        /// 從設定檔讀取上次開啟的 HEX 檔並嘗試載入。
+        /// </summary>
         private void LoadLastHexFromConfig()
         {
             string hexFile = configFile.Get("Target", "Filename", "");
@@ -105,6 +115,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 預先建立 I2C 裝置位址的下拉選單項目，並套用設定檔中的預設值。
+        /// </summary>
         private void InitDeviceAddressCollection()
         {
             DeviceAddressCollection = new byte[128];
@@ -119,10 +132,18 @@ namespace GMTI2CUpdater
                 SelectedDeviceAddress = deviceaddressfromIni.Value;
             }
         }
+
+        /// <summary>
+        /// 當偵測到螢幕數量變更時重新整理可用的 I2C 介面清單。
+        /// </summary>
         private void OnMonitorChanged(bool added)
         {
             RefreshMonitor();
         }
+
+        /// <summary>
+        /// 從硬體層取得所有可用顯示介面並預設選取第一個。
+        /// </summary>
         private void RefreshMonitor()
         {
             AdapterInfos = I2CAdapterManger.GetAvailableDisplays();
@@ -140,11 +161,17 @@ namespace GMTI2CUpdater
             );
         }
 
+        /// <summary>
+        /// 從設定檔讀取十六進位的 byte 值，若不存在則回傳 null。
+        /// </summary>
         private byte? ReadIniHexByte(string section, string key, string defaultValue = "Null")
         {
             return HexHelper.ParseHexByteOrNull(configFile.Get(section, key, defaultValue));
         }
 
+        /// <summary>
+        /// 確認使用者已選取 I2C 介面，若未選取則寫入提示訊息。
+        /// </summary>
         private bool EnsureAdapterSelected()
         {
             if (SelectedAdapter != null)
@@ -156,6 +183,9 @@ namespace GMTI2CUpdater
             return false;
         }
 
+        /// <summary>
+        /// 確認已載入目標 HEX 檔並取得位址範圍。
+        /// </summary>
         private bool EnsureTargetSizeReady()
         {
             if (TotalSize > 0)
@@ -167,6 +197,9 @@ namespace GMTI2CUpdater
             return false;
         }
 
+        /// <summary>
+        /// 當需要 I2C over AUX 時，確認已選取解鎖腳本。
+        /// </summary>
         private bool EnsureUnlockConfigured()
         {
             if (!NeedsDisplayUnlock || SelectedAdaptertCONUnlock != null)
@@ -178,6 +211,9 @@ namespace GMTI2CUpdater
             return false;
         }
 
+        /// <summary>
+        /// 綜合檢查操作前的必要條件，必要時顯示對應提示。
+        /// </summary>
         private bool EnsureOperationReady(bool requireSize = true)
         {
             if (!EnsureAdapterSelected())
@@ -212,6 +248,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 依需求先執行解鎖腳本，再進行 I2C 動作，最後確保重新上鎖。
+        /// </summary>
         private void ExecuteWithOptionalUnlock(byte deviceAddress, Action<I2CAdapterBase> action)
         {
             bool needUnlock = NeedsDisplayUnlock && SelectedAdaptertCONUnlock != null;
@@ -234,6 +273,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 依設定檔定義的 Lock/Unlock 指令包覆 I2C 動作。
+        /// </summary>
         private void ExecuteWithOptionalLockCommands(
             I2CAdapterBase adapter,
             byte deviceAddress,
@@ -268,6 +310,9 @@ namespace GMTI2CUpdater
             (TargetRangeText, TargetChecksum) = BuildMetadata(TargetData, TargetDefinedMap);
         }
 
+        /// <summary>
+        /// 根據資料與定義範圍計算顯示文字與 Checksum。
+        /// </summary>
         private (string RangeText, string Checksum) BuildMetadata(byte[] data, bool[] definedMap)
         {
             return (FormatRange(BaseAddress, data?.Length ?? 0), CalculateChecksum(data, definedMap));
@@ -283,6 +328,10 @@ namespace GMTI2CUpdater
             AdviceNeedAdmin = (SelectedAdapter?.AdapterInfo.IsNeedPrivilege ?? false) && !IsAdmin;
             // 例：AdviceNeedAdmin = (SelectedAdapter?.AdapterInfo?.IsNeedPrivilege ?? false) && IsAdmin;
         }
+
+        /// <summary>
+        /// 嘗試載入對應顯示介面的 TCON 解鎖腳本並套用最近使用的選項。
+        /// </summary>
         private void UpdateUnlockTcon()
         {
             if (SelectedAdapter == null)
@@ -304,6 +353,9 @@ namespace GMTI2CUpdater
 
         // 對應 XAML: ReadBeforeCommand
         [RelayCommand]
+        /// <summary>
+        /// 從目前選取的裝置讀取指定範圍的資料並更新 BeforeData。
+        /// </summary>
         private void ReadBefore()
         {
             if (!EnsureOperationReady())
@@ -322,6 +374,9 @@ namespace GMTI2CUpdater
             //InitDemoDataCore();
         }
 
+        /// <summary>
+        /// 決定填充未定義位址的位元組值，支援預設或自訂模式。
+        /// </summary>
         private byte GetFillByte()
         {
             // FillMode 可以是 "0xFF" / "0x00" / "自訂"，或你之後改成別的
@@ -339,6 +394,10 @@ namespace GMTI2CUpdater
             // fallback
             return 0xFF;
         }
+
+        /// <summary>
+        /// 讀取指定的 HEX 檔案，解析內容並建立 TargetData 與定義範圍。
+        /// </summary>
         public void LoadHexFromFile(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
@@ -408,6 +467,9 @@ namespace GMTI2CUpdater
 
         // 對應 XAML: LoadHexCommand
         [RelayCommand]
+        /// <summary>
+        /// 顯示檔案開啟對話框讓使用者選擇 HEX 檔，並呼叫載入流程。
+        /// </summary>
         private void LoadHex()
         {
             var dlg = new OpenFileDialog
@@ -425,6 +487,9 @@ namespace GMTI2CUpdater
 
         // 對應 XAML: UpdateCommand
         [RelayCommand]
+        /// <summary>
+        /// 將 Before 與 Target 差異寫入裝置，並支援設定檔提供的解鎖與鎖定指令。
+        /// </summary>
         private void Update()
         {
             var lockCommands = ReadLockCommands();
@@ -445,6 +510,10 @@ namespace GMTI2CUpdater
                 Progress = 100;
             }
         }
+
+        /// <summary>
+        /// 只將實際差異的區塊寫入裝置，避免重複寫入未變更的資料。
+        /// </summary>
         public void WriteDiffBytes(I2CAdapterBase adapter,
             byte deviceAddress,
             byte baseAddress,
@@ -519,6 +588,9 @@ namespace GMTI2CUpdater
 
         // 對應 XAML: ReadAfterCommand
         [RelayCommand]
+        /// <summary>
+        /// 執行更新後的回讀，取得 AfterData 並更新相關資訊。
+        /// </summary>
         private void ReadAfter()
         {
             if (!EnsureOperationReady())
@@ -538,11 +610,17 @@ namespace GMTI2CUpdater
 
         // 對應 XAML: CompareCommand
         [RelayCommand]
+        /// <summary>
+        /// 比對 Target 與 After 的資料，並在記錄中顯示差異摘要。
+        /// </summary>
         private void Compare()
         {
             CompareTargetAndAfterCore();
         }
         [RelayCommand]
+        /// <summary>
+        /// 依設定檔定義的命令觸發燒錄 EEPROM 的流程。
+        /// </summary>
         private void WriteEEPROM()
         {
             var writeEEPROMIndex = ReadIniHexByte("I2CSpec", "WriteEEPROMIndex");
@@ -572,6 +650,9 @@ namespace GMTI2CUpdater
             }
         }
         [RelayCommand]
+        /// <summary>
+        /// 依序執行讀檔、讀取裝置、寫入、回讀與比對，並在成功後執行燒錄。
+        /// </summary>
         private void ApplyAll()
         {
             Log($"Step1：讀取Hex檔");
@@ -604,12 +685,18 @@ namespace GMTI2CUpdater
         }
         // 對應 XAML: ClearLogCommand
         [RelayCommand]
+        /// <summary>
+        /// 清除畫面上的操作紀錄。
+        /// </summary>
         private void ClearLog()
         {
             LogItems.Clear();
         }
 
         // ====== 下面是 Demo 用的核心邏輯（private，不會產生 Command）======
+        /// <summary>
+        /// 建立指定長度且全為 true 的布林陣列，供測試資料使用。
+        /// </summary>
         private bool[] CreateAllTrue(int length)
         {
             var arr = new bool[length];
@@ -750,11 +837,13 @@ namespace GMTI2CUpdater
             }
         }
 
-
+        /// <summary>
+        /// 依已定義的位元組計算簡單的總和 Checksum，未定義區段不納入計算。
+        /// </summary>
         private string CalculateChecksum(byte[] data, bool[] defineMaps)
         {
             if (data == null || data.Length == 0 ||
-                defineMaps == null || defineMaps.Length == 0 || 
+                defineMaps == null || defineMaps.Length == 0 ||
                 defineMaps.Length != data.Length)
                 return "-";
 
@@ -770,6 +859,10 @@ namespace GMTI2CUpdater
             //short checksum = (sum & 0xFFFF);
             return $"0x{sum:X4}";
         }
+
+        /// <summary>
+        /// 產生顯示用的位址範圍文字，格式為起訖位址與資料長度。
+        /// </summary>
         private string FormatRange(int baseAddr, int size)
         {
             if (size <= 0) return "-";
@@ -777,6 +870,9 @@ namespace GMTI2CUpdater
             return $"0x{baseAddr:X2}-0x{end:X2} ({size} bytes)";
         }
 
+        /// <summary>
+        /// 將訊息附上時間戳記後寫入 Log 集合，供 UI 即時顯示。
+        /// </summary>
         private void Log(string message)
         {
             LogItems.Add($"[{DateTime.Now:HH:mm:ss}] {message}");

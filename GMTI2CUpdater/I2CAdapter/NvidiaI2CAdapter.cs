@@ -1,7 +1,7 @@
 ﻿namespace GMTI2CUpdater.I2CAdapter
 {
     /// <summary>
-    /// 以 Intel IGCL 為底層實作的 I2CAdapter 範例。
+    /// 以 NVIDIA NVAPI 為底層實作的 I2CAdapter 範例。
     /// </summary>
     public sealed class NvidiaI2CAdapter : I2CAdapterBase
     {
@@ -60,6 +60,9 @@
             nvidia.WriteI2CWithoutIndex(AdapterInfo, address, data);
         }
 
+        /// <summary>
+        /// 此類別每次呼叫都暫時建立 NVAPI 物件，因此自身無額外資源可釋放。
+        /// </summary>
         public override void Dispose()
         {
             throw new NotImplementedException();

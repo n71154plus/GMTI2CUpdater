@@ -8,11 +8,17 @@ namespace GMTI2CUpdater
     // 簡單版 INI 讀寫，不用 Win32
     internal class IniFile
     {
+        /// <summary>
+        /// 以區段名稱為 key、區段內字典為 value 儲存的資料結構。
+        /// </summary>
         private readonly Dictionary<string, Dictionary<string, string>> _data
             = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
         public string FilePath { get; }
 
+        /// <summary>
+        /// 建構時自動讀取檔案內容並解析成內部結構。
+        /// </summary>
         public IniFile(string path)
         {
             if (!System.IO.Path.IsPathRooted(path))
@@ -29,6 +35,9 @@ namespace GMTI2CUpdater
         #region Public API
 
         // 讀取字串
+        /// <summary>
+        /// 取得指定區段與鍵值的內容，若不存在則回傳預設值。
+        /// </summary>
         public string Get(string section, string key, string defaultValue = "")
         {
             if (_data.TryGetValue(section, out var sectionDict) &&
@@ -40,6 +49,9 @@ namespace GMTI2CUpdater
         }
 
         // 設定 / 新增
+        /// <summary>
+        /// 寫入或更新指定區段的鍵值，必要時自動建立區段。
+        /// </summary>
         public void Set(string section, string key, string value)
         {
             if (!_data.TryGetValue(section, out var sectionDict))
@@ -52,6 +64,9 @@ namespace GMTI2CUpdater
         }
 
         // 判斷是否存在
+        /// <summary>
+        /// 檢查指定的區段與鍵是否存在於內部資料。
+        /// </summary>
         public bool ContainsKey(string section, string key)
         {
             return _data.TryGetValue(section, out var sectionDict)
@@ -59,6 +74,9 @@ namespace GMTI2CUpdater
         }
 
         // 刪除 key
+        /// <summary>
+        /// 移除指定區段中的鍵值。
+        /// </summary>
         public void RemoveKey(string section, string key)
         {
             if (_data.TryGetValue(section, out var sectionDict))
@@ -68,12 +86,18 @@ namespace GMTI2CUpdater
         }
 
         // 刪除整個 section
+        /// <summary>
+        /// 移除整個區段與其內所有鍵值。
+        /// </summary>
         public void RemoveSection(string section)
         {
             _data.Remove(section);
         }
 
         // 存回檔案
+        /// <summary>
+        /// 將目前資料寫回建構時指定的檔案路徑。
+        /// </summary>
         public void Save()
         {
             Save(FilePath);
@@ -83,6 +107,9 @@ namespace GMTI2CUpdater
 
         #region Load / Save
 
+        /// <summary>
+        /// 從檔案逐行讀取並解析成區段與鍵值集合。
+        /// </summary>
         private void Load(string path)
         {
             _data.Clear();
@@ -129,6 +156,9 @@ namespace GMTI2CUpdater
             }
         }
 
+        /// <summary>
+        /// 將目前的資料寫入指定檔案，以標準 INI 格式輸出。
+        /// </summary>
         private void Save(string path)
         {
             var sb = new StringBuilder();

@@ -4,6 +4,9 @@ using System.Runtime.InteropServices;
 
 namespace GMTI2CUpdater.Helper
 {
+    /// <summary>
+    /// 提供與螢幕列舉相關的 P/Invoke helper。
+    /// </summary>
     public static class MonitorHelper
     {
         private delegate bool MonitorEnumDelegate(IntPtr hMonitor, IntPtr hdc, ref Rect lprcMonitor, IntPtr dwData);
@@ -17,6 +20,9 @@ namespace GMTI2CUpdater.Helper
             public int Left, Top, Right, Bottom;
         }
 
+        /// <summary>
+        /// 透過 Win32 API 列舉顯示器並回傳數量。
+        /// </summary>
         public static int GetMonitorCount()
         {
             int count = 0;

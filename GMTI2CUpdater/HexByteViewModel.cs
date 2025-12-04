@@ -2,8 +2,17 @@
 
 namespace GMTI2CUpdater
 {
+    /// <summary>
+    /// 描述 Hex 檢視中的單一位元組，含位移、實際值與狀態等資訊。
+    /// </summary>
     public partial class HexByteViewModel : ObservableObject
     {
+        /// <summary>
+        /// 建立位元組模型並指定索引、值與是否為差異值。
+        /// </summary>
+        /// <param name="offset">相對於整體資料陣列的索引。</param>
+        /// <param name="value">實際位元組值。</param>
+        /// <param name="isDiff">是否與比對來源存在差異。</param>
         public HexByteViewModel(int offset, byte value, bool isDiff)
         {
             Offset = offset;

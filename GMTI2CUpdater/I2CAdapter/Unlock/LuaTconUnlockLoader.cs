@@ -7,6 +7,9 @@ using MoonSharp.Interpreter.Loaders;
 
 namespace GMTI2CUpdater.I2CAdapter.Unlock
 {
+    /// <summary>
+    /// 負責從 Scripts/TconUnlock 資料夾載入 Lua 解鎖腳本，並包裝成解鎖物件。
+    /// </summary>
     internal class LuaTconUnlockLoader
     {
         private readonly string scriptDirectory;
@@ -21,6 +24,9 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             scriptDirectory = Path.Combine(AppContext.BaseDirectory, "Scripts", "TconUnlock");
         }
 
+        /// <summary>
+        /// 依序載入所有 Lua 腳本並產生對應的解鎖實例，若目錄不存在會先建立後返回空集合。
+        /// </summary>
         public IEnumerable<TCONUnlockBase> Load(I2CAdapterBase adapter)
         {
             if (adapter == null)
@@ -49,6 +55,9 @@ namespace GMTI2CUpdater.I2CAdapter.Unlock
             }
         }
 
+        /// <summary>
+        /// 載入單一 Lua 腳本檔案並驗證必要的欄位，返回封裝好的解鎖器實例。
+        /// </summary>
         private LuaTconUnlock LoadScript(string scriptPath, I2CAdapterBase adapter)
         {
             var script = new Script(CoreModules.Preset_SoftSandbox)

@@ -60,6 +60,9 @@
             igcl.WriteI2CWithoutIndex(AdapterInfo, address, data);
         }
 
+        /// <summary>
+        /// 透過 using 區塊瞬時建立底層 API，不需額外釋放狀態。
+        /// </summary>
         public override void Dispose()
         {
             throw new NotImplementedException();
