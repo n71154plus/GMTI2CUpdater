@@ -1,6 +1,4 @@
 using System;
-using System.Threading;
-using GMTI2CUpdater.I2CAdapter.Hardware;
 
 namespace GMTI2CUpdater.I2CAdapter
 {
@@ -16,7 +14,7 @@ namespace GMTI2CUpdater.I2CAdapter
     /// </summary>
     public sealed class Cy8C24894Adapter : I2CAdapterBase
     {
-        private const int ReportLength = CY8C24894.ReportLength;
+        private const int ReportLength = 65;
         private const int MaxI2CChunk = 32;
 
         private const byte I2cWriteNotLast = 0x02;
@@ -26,9 +24,14 @@ namespace GMTI2CUpdater.I2CAdapter
         private const byte I2cReadLast = 0x0B;
         private const byte I2cReadNotLast = 0x03;
 
-        private readonly ushort _vendorId;
-        private readonly ushort _productId;
+        private readonly HidDevice _hid;
         private readonly I2C_Frequency _frequency;
+
+        // 每一個 Report 專用 buffer
+        private readonly byte[] _output = new byte[ReportLength];
+        private readonly byte[] _input = new byte[ReportLength];
+
+        private bool _initialized;
 
         public Cy8C24894Adapter(I2CAdapterInfo info,
                                 ushort vendorId,
@@ -36,9 +39,8 @@ namespace GMTI2CUpdater.I2CAdapter
                                 I2C_Frequency frequency = I2C_Frequency.F100K)
             : base(info)
         {
-            _vendorId = vendorId;
-            _productId = productId;
             _frequency = frequency;
+            _hid = new HidDevice(vendorId, productId, ReportLength, timeoutMs: 200);
         }
 
         /// <summary>
@@ -57,83 +59,40 @@ namespace GMTI2CUpdater.I2CAdapter
         /// <summary>
         /// 確保 HID 已開啟，且已送出初始化指令與頻率設定。
         /// </summary>
-        private static void ClearBuffers(byte[] output, byte[] input)
+        private void EnsureReady()
         {
-            Array.Clear(output, 0, output.Length);
-            Array.Clear(input, 0, input.Length);
-        }
-
-        private HidDevice CreateHidDevice()
-        {
-            return new HidDevice(_vendorId, _productId, ReportLength, timeoutMs: 200);
-        }
-
-        private static (byte[] Output, byte[] Input) CreateReportBuffers()
-        {
-            return (new byte[ReportLength], new byte[ReportLength]);
-        }
-
-        private void EnsureReady(HidDevice hid, byte[] output, byte[] input)
-        {
-            if (!hid.Open())
+            if (!_hid.Open())
             {
                 throw new Exception("無法連接 CY8C24894 HID 裝置，請確認治具是否連接。");
             }
-
-            ClearBuffers(output, input);
-            output[0] = 0;      // Report ID
-            output[1] = 0x0A;
-            output[2] = 0x02;
-            output[3] = 0x80;
-            output[4] = 0x02;
-
-            while (input[1] != 0x05)
+            //Thread.Sleep(100);
+            _output[0] = 0;      // Report ID
+            _output[1] = 0x0A;
+            _output[2] = 0x02;
+            _output[3] = 0x80;
+            _output[4] = 0x02;
+            Array.Clear(_input, 0, _input.Length);
+            while (_input[1] != 0x05)
             {
                 Thread.Sleep(100);
-                hid.Write(output, ReportLength, out _);
-                _ = hid.Read(input, ReportLength, out _);
+                _hid.Write(_output, ReportLength, out _);
+                _ = _hid.Read(_input, ReportLength, out _);
             }
 
-            ClearBuffers(output, input);
-            output[0] = 0;
-            output[1] = (byte)_frequency;
-
-            if (!hid.Write(output, ReportLength, out _))
+            // 設定 I2C 頻率
+            Array.Clear(_output, 0, _output.Length);
+            _output[0] = 0;
+            _output[1] = (byte)_frequency;
+            Array.Clear(_input, 0, _output.Length);
+            if (!_hid.Write(_output, ReportLength, out _))
             {
-                _ = hid.Read(input, ReportLength, out _);
+                _ = _hid.Read(_input, ReportLength, out _);
+                _hid.Close();
                 throw new Exception("CY8C24894 設定頻率失敗(Write)。");
             }
+            _ = _hid.Read(_input, ReportLength, out _);
 
-            _ = hid.Read(input, ReportLength, out _);
-        }
-
-        private static void SendPacket(
-            HidDevice hid,
-            byte[] output,
-            byte[] input,
-            CY8C24894.OutputPacketWrite packet)
-        {
-            CY8C24894.WritePacketToBuffer(packet, output);
-            hid.Write(output, ReportLength, out _);
-            hid.Read(input, ReportLength, out _);
-        }
-
-        private void UseDevice(Action<HidDevice, byte[], byte[]> action)
-        {
-            using var hid = CreateHidDevice();
-            var (output, input) = CreateReportBuffers();
-
-            EnsureReady(hid, output, input);
-            action(hid, output, input);
-        }
-
-        private T UseDevice<T>(Func<HidDevice, byte[], byte[], T> action)
-        {
-            using var hid = CreateHidDevice();
-            var (output, input) = CreateReportBuffers();
-
-            EnsureReady(hid, output, input);
-            return action(hid, output, input);
+            _initialized = true;
         }
 
         #endregion
@@ -191,7 +150,7 @@ namespace GMTI2CUpdater.I2CAdapter
 
         public override void Dispose()
         {
-            // 每次操作都以 using 建立 HidDevice，沒有長時間持有的 unmanaged 資源。
+            _hid?.Dispose();
         }
 
         #endregion
@@ -202,45 +161,60 @@ namespace GMTI2CUpdater.I2CAdapter
         {
             if (writeDataArray == null) throw new ArgumentNullException(nameof(writeDataArray));
 
-            UseDevice((hid, output, input) =>
+            EnsureReady();
+
+            try
             {
+                int num = 0;
+
                 if (writeDataArray.Length <= MaxI2CChunk)
                 {
-                    var payload = new byte[1 + writeDataArray.Length];
-                    payload[0] = regAddress;
-                    Buffer.BlockCopy(writeDataArray, 0, payload, 1, writeDataArray.Length);
+                    num = 0;
+                    Array.Clear(_output, 0, _output.Length);
+                    Array.Clear(_input, 0, _input.Length);
 
-                    var packet = CY8C24894.CreateRawPacket(
-                        I2cWriteLast,
-                        (byte)payload.Length,
-                        (byte)(devAddress >> 1),
-                        payload);
+                    _output[num++] = 0; // Report ID
+                    _output[num++] = I2cWriteLast;
+                    _output[num++] = (byte)(1u + writeDataArray.Length);
+                    _output[num++] = (byte)(devAddress >> 1);
+                    _output[num++] = regAddress;
 
-                    SendPacket(hid, output, input, packet);
+                    for (int j = 0; j < writeDataArray.Length; j++)
+                    {
+                        _output[num++] = writeDataArray[j];
+                    }
 
-                    if (input[1] == 0)
+                    _hid.Write(_output, ReportLength, out _);
+                    _hid.Read(_input, ReportLength, out _);
+
+                    if (_input[1] == 0)
                     {
                         throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                     }
                 }
                 else
                 {
-                    var headerPacket = CY8C24894.CreateRawPacket(
-                        I2cWriteNotLast,
-                        1,
-                        (byte)(devAddress >> 1),
-                        new[] { regAddress });
+                    // 先送起始位址
+                    num = 0;
+                    Array.Clear(_output, 0, _output.Length);
+                    Array.Clear(_input, 0, _input.Length);
+                    _output[num++] = 0;
+                    _output[num++] = I2cWriteNotLast;
+                    _output[num++] = 1;
+                    _output[num++] = (byte)(devAddress >> 1);
+                    _output[num++] = regAddress;
 
-                    SendPacket(hid, output, input, headerPacket);
-
-                    if (input[1] == 0)
+                    _hid.Write(_output, ReportLength, out _);
+                    _hid.Read(_input, ReportLength, out _);
+                    if (_input[1] == 0)
                     {
-                        var stopPacket = CY8C24894.CreateRawPacket(
-                            I2CWriteStop,
-                            0,
-                            0,
-                            Array.Empty<byte>());
-                        SendPacket(hid, output, input, stopPacket);
+                        num = 0;
+                        Array.Clear(_output, 0, _output.Length);
+                        Array.Clear(_input, 0, _input.Length);
+                        _output[num++] = 0;
+                        _output[num++] = 0x08;
+                        _hid.Write(_output, ReportLength, out _);
+                        _hid.Read(_input, ReportLength, out _);
                         throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                     }
 
@@ -249,76 +223,108 @@ namespace GMTI2CUpdater.I2CAdapter
 
                     for (int chunk = 0; chunk < fullChunks; chunk++)
                     {
-                        var chunkPayload = new byte[MaxI2CChunk];
-                        Buffer.BlockCopy(writeDataArray, MaxI2CChunk * chunk, chunkPayload, 0, MaxI2CChunk);
+                        num = 0;
+                        Array.Clear(_output, 0, _output.Length);
+                        Array.Clear(_input, 0, _input.Length);
+                        _output[num++] = 0;
+                        _output[num++] = (byte)((remain == 0 && chunk == fullChunks - 1) ? 8 : 0);
+                        _output[num++] = (byte)MaxI2CChunk;
 
-                        byte control = (byte)((remain == 0 && chunk == fullChunks - 1) ? I2CWriteStop : 0);
+                        for (int m = 0; m < MaxI2CChunk; m++)
+                        {
+                            _output[num++] = writeDataArray[MaxI2CChunk * chunk + m];
+                        }
 
-                        var chunkPacket = CY8C24894.CreateRawPacket(
-                            control,
-                            (byte)MaxI2CChunk,
-                            0,
-                            chunkPayload);
-
-                        SendPacket(hid, output, input, chunkPacket);
+                        _hid.Write(_output, ReportLength, out _);
+                        _hid.Read(_input, ReportLength, out _);
                     }
 
                     if (remain != 0)
                     {
-                        var remainPayload = new byte[remain];
-                        Buffer.BlockCopy(writeDataArray, writeDataArray.Length - remain, remainPayload, 0, remain);
+                        num = 0;
+                        Array.Clear(_output, 0, _output.Length);
+                        Array.Clear(_input, 0, _input.Length);
+                        _output[num++] = 0;
+                        _output[num++] = I2CWriteStop;
+                        _output[num++] = (byte)remain;
 
-                        var tailPacket = CY8C24894.CreateRawPacket(
-                            I2CWriteStop,
-                            (byte)remain,
-                            0,
-                            remainPayload);
+                        for (int n = 0; n < remain; n++)
+                        {
+                            _output[num++] = writeDataArray[writeDataArray.Length - remain + n];
+                        }
 
-                        SendPacket(hid, output, input, tailPacket);
+                        _hid.Write(_output, ReportLength, out _);
+                        _hid.Read(_input, ReportLength, out _);
                     }
                 }
-            });
+            }
+            finally
+            {
+                // 視需求決定是否每次都關閉 HID。
+                // 這裡先保持開啟，讓整個 Adapter 生命週期共用一個 handle。
+                // 若你希望和舊版一樣每次都關，這裡可以呼叫 _hid.Close();
+                _hid.Close();
+            }
         }
 
         private void I2CRead(byte devAddress, byte regAddress, ref byte[] readDataArray)
         {
             if (readDataArray == null) throw new ArgumentNullException(nameof(readDataArray));
 
-            UseDevice((hid, output, input) =>
+            EnsureReady();
+
+            try
             {
-                var headerPacket = CY8C24894.CreateRawPacket(
-                    I2cWriteNotLast,
-                    1,
-                    (byte)(devAddress >> 1),
-                    new[] { regAddress });
+                int num = 0;
 
-                SendPacket(hid, output, input, headerPacket);
+                // 先寫入 index
+                num = 0;
+                Array.Clear(_output, 0, _output.Length);
+                Array.Clear(_input, 0, _input.Length);
+                _output[num++] = 0;
+                _output[num++] = I2cWriteNotLast;
+                _output[num++] = 1;
+                _output[num++] = (byte)(devAddress >> 1);
+                _output[num++] = regAddress;
 
-                if (input[1] == 0)
+                _hid.Write(_output, ReportLength, out _);
+                _hid.Read(_input, ReportLength, out _);
+
+                if (_input[1] == 0)
                 {
-                    var stopPacket = CY8C24894.CreateRawPacket(I2CWriteStop, 0, 0, Array.Empty<byte>());
-                    SendPacket(hid, output, input, stopPacket);
+                    num = 0;
+                    Array.Clear(_output, 0, _output.Length);
+                    Array.Clear(_input, 0, _input.Length);
+                    _output[num++] = 0;
+                    _output[num++] = I2CWriteStop;
+                    _hid.Write(_output, ReportLength, out _);
+                    _hid.Read(_input, ReportLength, out _);
+                    _hid.Close();
                     throw new Exception("送Device Address找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                 }
 
                 if (readDataArray.Length <= MaxI2CChunk)
                 {
-                    var packet = CY8C24894.CreateRawPacket(
-                        I2cReadLast,
-                        (byte)readDataArray.Length,
-                        (byte)(devAddress >> 1),
-                        Array.Empty<byte>());
+                    num = 0;
+                    Array.Clear(_output, 0, _output.Length);
+                    Array.Clear(_input, 0, _input.Length);
+                    _output[num++] = 0;
+                    _output[num++] = I2cReadLast;
+                    _output[num++] = (byte)readDataArray.Length;
+                    _output[num++] = (byte)(devAddress >> 1);
 
-                    SendPacket(hid, output, input, packet);
+                    _hid.Write(_output, ReportLength, out _);
+                    _hid.Read(_input, ReportLength, out _);
 
-                    if (input[1] == 0)
+                    if (_input[1] == 0)
                     {
+                        _hid.Close();
                         throw new Exception("I2C讀取Command失敗");
                     }
 
                     for (int j = 0; j < readDataArray.Length; j++)
                     {
-                        readDataArray[j] = input[2 + j];
+                        readDataArray[j] = _input[2 + j];
                     }
                 }
                 else
@@ -328,85 +334,100 @@ namespace GMTI2CUpdater.I2CAdapter
 
                     for (int k = 0; k < fullChunks; k++)
                     {
-                        byte control;
-                        byte device = 0;
+                        num = 0;
+                        Array.Clear(_output, 0, _output.Length);
+                        Array.Clear(_input, 0, _input.Length);
+                        _output[num++] = 0;
 
                         if (k == 0)
                         {
-                            control = I2cReadNotLast;
-                            device = (byte)(devAddress >> 1);
+                            _output[num++] = I2cReadNotLast;
+                            _output[num++] = MaxI2CChunk;
+                            _output[num++] = (byte)(devAddress >> 1);
                         }
                         else
                         {
-                            control = (byte)((remain != 0 || k != fullChunks - 1) ? 1 : 9);
+                            _output[num++] = (byte)((remain != 0 || k != fullChunks - 1) ? 1 : 9);
+                            _output[num++] = MaxI2CChunk;
                         }
 
-                        var packet = CY8C24894.CreateRawPacket(
-                            control,
-                            MaxI2CChunk,
-                            device,
-                            Array.Empty<byte>());
-
-                        SendPacket(hid, output, input, packet);
+                        _hid.Write(_output, ReportLength, out _);
+                        _hid.Read(_input, ReportLength, out _);
 
                         for (int l = 0; l < MaxI2CChunk; l++)
                         {
-                            readDataArray[k * MaxI2CChunk + l] = input[2 + l];
+                            readDataArray[k * MaxI2CChunk + l] = _input[2 + l];
                         }
                     }
 
                     if (remain != 0)
                     {
-                        var packet = CY8C24894.CreateRawPacket(
-                            I2CReadeStop,
-                            (byte)remain,
-                            0,
-                            Array.Empty<byte>());
+                        num = 0;
+                        Array.Clear(_output, 0, _output.Length);
+                        Array.Clear(_input, 0, _input.Length);
+                        _output[num++] = 0;
+                        _output[num++] = I2CReadeStop;
+                        _output[num++] = (byte)remain;
 
-                        SendPacket(hid, output, input, packet);
+                        _hid.Write(_output, ReportLength, out _);
+                        _hid.Read(_input, ReportLength, out _);
 
                         for (int m = 0; m < remain; m++)
                         {
-                            readDataArray[readDataArray.Length - remain + m] = input[2 + m];
+                            readDataArray[readDataArray.Length - remain + m] = _input[2 + m];
                         }
                     }
                 }
-            });
+            }
+            finally
+            {
+                // 同上，預設不關，讓整個 adapter 生命週期共用。
+                _hid.Close();
+            }
         }
 
         private void I2C_Single_Write(byte devAddress, byte writeData)
         {
-            UseDevice((hid, output, input) =>
-            {
-                var packet = CY8C24894.CreateRawPacket(
-                    I2cWriteLast,
-                    1,
-                    (byte)(devAddress >> 1),
-                    new[] { writeData });
+            EnsureReady();
 
-                SendPacket(hid, output, input, packet);
-            });
+            Array.Clear(_output, 0, _output.Length);
+            Array.Clear(_input, 0, _input.Length);
+
+            int num = 0;
+            _output[num++] = 0;
+            _output[num++] = 10;
+            _output[num++] = 1;
+            _output[num++] = (byte)(devAddress >> 1);
+            _output[num++] = writeData;
+
+            _hid.Write(_output, ReportLength, out _);
+            _hid.Read(_input, ReportLength, out _);
+            _hid.Close();
         }
 
         private void I2C_Single_Read(byte devAddress, ref byte readData)
         {
-            UseDevice((hid, output, input) =>
+            EnsureReady();
+
+            Array.Clear(_output, 0, _output.Length);
+            Array.Clear(_input, 0, _input.Length);
+
+            int num = 0;
+            _output[num++] = 0;
+            _output[num++] = 11;
+            _output[num++] = 1;
+            _output[num++] = (byte)(devAddress >> 1);
+
+            _hid.Write(_output, ReportLength, out _);
+            _hid.Read(_input, ReportLength, out _);
+
+            if (_input[1] == 0)
             {
-                var packet = CY8C24894.CreateRawPacket(
-                    I2cReadLast,
-                    1,
-                    (byte)(devAddress >> 1),
-                    Array.Empty<byte>());
+                throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
+            }
 
-                SendPacket(hid, output, input, packet);
-
-                if (input[1] == 0)
-                {
-                    throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
-                }
-
-                readData = input[2];
-            });
+            readData = _input[2];
+            _hid.Close();
         }
 
         #endregion
