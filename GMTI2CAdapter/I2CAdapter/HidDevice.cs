@@ -23,6 +23,7 @@ namespace GMTI2CUpdater.I2CAdapter
         private string? _devicePath;
         private CySafeFileHandle? _handle;
         private uint _lastError;
+        private bool _disposed;
 
         public HidDevice(ushort vendorId, ushort productId,
                          int reportLength,
@@ -54,6 +55,8 @@ namespace GMTI2CUpdater.I2CAdapter
         /// </summary>
         public bool FindDevice()
         {
+            ThrowIfDisposed();
+
             _devicePath = null;
             bool success = false;
 
@@ -148,6 +151,8 @@ namespace GMTI2CUpdater.I2CAdapter
         /// </summary>
         public bool Open()
         {
+            ThrowIfDisposed();
+
             if (IsOpen)
                 return true;
 
@@ -171,6 +176,8 @@ namespace GMTI2CUpdater.I2CAdapter
 
         public void Close()
         {
+            ThrowIfDisposed();
+
             if (_handle != null && !_handle.IsInvalid)
             {
                 _handle.Close();
@@ -185,6 +192,8 @@ namespace GMTI2CUpdater.I2CAdapter
         public bool Write(byte[] buffer, int length, out int bytesWritten)
         {
             bytesWritten = 0;
+
+            ThrowIfDisposed();
 
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (length <= 0 || length > buffer.Length) throw new ArgumentOutOfRangeException(nameof(length));
@@ -242,6 +251,8 @@ namespace GMTI2CUpdater.I2CAdapter
             if (length <= 0 || length > buffer.Length) throw new ArgumentOutOfRangeException(nameof(length));
             if (length > _reportLength) throw new ArgumentOutOfRangeException(nameof(length), "length 超過 report 長度");
 
+            ThrowIfDisposed();
+
             if (!Open())
                 return false;
 
@@ -291,6 +302,8 @@ namespace GMTI2CUpdater.I2CAdapter
         {
             bytesTransferred = 0;
             _lastError = 0;
+
+            ThrowIfDisposed();
 
             // 建立 Event
             IntPtr hEvent = HidDevicePInvoke.CreateEvent(IntPtr.Zero, false, false, null);
@@ -379,7 +392,22 @@ namespace GMTI2CUpdater.I2CAdapter
 
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             Close();
+            _disposed = true;
+            GC.SuppressFinalize(this);
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(HidDevice));
+            }
         }
     }
 }
