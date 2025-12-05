@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
@@ -6,13 +7,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
     public sealed class CY8C24894 : IDisposable
     {
         private const int WriteTransferDataSize = 61;
+        internal const int ReportLength = WriteTransferDataSize + 4;
+
         public void Dispose()
         {
-            throw new NotImplementedException();
-        }
-        public CY8C24894()
-        {
-
+            GC.SuppressFinalize(this);
         }
 
 
@@ -40,7 +39,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         /// Buf 固定 0x40 bytes，透過 ByValArray 對應 unmanaged 結構。
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        private struct OutputPacketWrite
+        internal struct OutputPacketWrite
         {
             public byte ReportId;      // HID Report ID (通常是 0)
             public byte ControlByte;   // 所有 I2C 控制 bit
@@ -214,6 +213,55 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             /// </summary>
             public bool HasAddressByte => StartSignal || RestartSignal;
         }
+
+        internal static OutputPacketWrite CreateRawPacket(
+            byte controlByte,
+            byte lengthRaw,
+            byte deviceAddress,
+            ReadOnlySpan<byte> payload)
+        {
+            var packet = new OutputPacketWrite
+            {
+                ControlByte = controlByte,
+                LengthRaw = lengthRaw,
+                DeviceAddress = deviceAddress,
+                Data = new byte[WriteTransferDataSize]
+            };
+
+            if (payload.Length > WriteTransferDataSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(payload), $"Max {WriteTransferDataSize} bytes per packet");
+            }
+
+            if (payload.Length > 0)
+            {
+                payload.CopyTo(packet.Data);
+            }
+
+            return packet;
+        }
+
+        internal static void WritePacketToBuffer(OutputPacketWrite packet, byte[] buffer)
+        {
+            if (buffer == null) throw new ArgumentNullException(nameof(buffer));
+            if (buffer.Length < ReportLength)
+            {
+                throw new ArgumentException($"Buffer length must be at least {ReportLength}.", nameof(buffer));
+            }
+
+            Array.Clear(buffer, 0, ReportLength);
+
+            buffer[0] = packet.ReportId;
+            buffer[1] = packet.ControlByte;
+            buffer[2] = packet.LengthRaw;
+            buffer[3] = packet.DeviceAddress;
+
+            int payloadLength = packet.DataLength;
+            if (payloadLength > 0 && packet.Data != null)
+            {
+                Buffer.BlockCopy(packet.Data, 0, buffer, 4, payloadLength);
+            }
+        }
         private static OutputPacketWrite CreateBridgePowerControlPacket(BridgePowerMode mode)
         {
             var packet = new OutputPacketWrite
@@ -246,7 +294,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             packet.RestartSignal = true;
             return packet;
         }
-        private static OutputPacketWrite CreateWritePacket(
+        internal static OutputPacketWrite CreateWritePacket(
             byte deviceAddress,
             byte[] payload,
             bool start,
@@ -279,7 +327,10 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             I2CFrequency frequency,
             bool reinitializeBus = true)
         {
-            var packet = new OutputPacketWrite();
+            var packet = new OutputPacketWrite
+            {
+                Data = new byte[WriteTransferDataSize]
+            };
 
             // 這是一個「控制 / 設定」用的封包，不是一般資料傳輸
             packet.Direction = TransferDirection.Write;
