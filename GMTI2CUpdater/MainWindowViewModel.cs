@@ -25,7 +25,8 @@ namespace GMTI2CUpdater
         private bool hasMonitorChanged;
         [ObservableProperty]
         private string monitorStatus = string.Empty;
-
+        private List<I2CAdapterBase> usbAdapterList = [];
+        private List<I2CAdapterBase> displayAdapterList = [];
 
 
 
@@ -91,8 +92,8 @@ namespace GMTI2CUpdater
             CustomFillValue = "0x00";
 
             IsSyncScrollEnabled = true;
-            ShowDiffWithBefore = false;
-            ShowDiffWithTarget = false;
+            ShowDiffWithBefore = true;
+            ShowDiffWithTarget = true;
 
             I2CStatusText = "";
             StatusMessage = "Ready";
@@ -146,14 +147,26 @@ namespace GMTI2CUpdater
         /// </summary>
         private void RefreshMonitor()
         {
-            List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvailableDisplays();
-            AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            //List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvailableDisplays();
+            //AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            displayAdapterList = I2CAdapterManger.GetAvailableDisplays();
+            AllAdapters = displayAdapterList
+                .Concat(usbAdapterList)
+                .GroupBy(x => x.Name)  // 用 Name 做鍵
+                .Select(g => g.First()) // 保留第一個
+                .ToList();
             SelectI2CAdapter();
         }
-        private void RefreshUsbAdapter()
+        public void RefreshUsbAdapter()
         {
-            List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvaiableUsbI2CAdapter();
-            AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            //List<I2CAdapterBase> displayList = I2CAdapterManger.GetAvaiableUsbI2CAdapter();
+            //AllAdapters.AddRangeDistinctBy(displayList, x => x.Name);
+            usbAdapterList = I2CAdapterManger.GetAvaiableUsbI2CAdapter();
+            AllAdapters = usbAdapterList
+                .Concat(displayAdapterList)
+                .GroupBy(x => x.Name)  // 用 Name 做鍵
+                .Select(g => g.First()) // 保留第一個
+                .ToList();
             SelectI2CAdapter();
         }
 
@@ -320,12 +333,12 @@ namespace GMTI2CUpdater
 
         private void UpdateBeforeMetadata()
         {
-            (BeforeRangeText, BeforeChecksum) = BuildMetadata(BeforeData, TargetDefinedMap);
+            (BeforeRangeText, BeforeChecksum) = BuildMetadata(BeforeData, BeforeDefinedMap);
         }
 
         private void UpdateAfterMetadata()
         {
-            (AfterRangeText, AfterChecksum) = BuildMetadata(AfterData, TargetDefinedMap);
+            (AfterRangeText, AfterChecksum) = BuildMetadata(AfterData, AfterDefinedMap);
         }
 
         private void UpdateTargetMetadata()
@@ -388,7 +401,7 @@ namespace GMTI2CUpdater
             var deviceaddress = SelectedDeviceAddress;
 
             if (TryPerformWithAdapter(nameof(ReadBefore), deviceaddress, adapter =>
-                BeforeData = adapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize)))
+                BeforeData = adapter.ReadI2CByteIndex(deviceaddress, 0, TotalSize + BaseAddress)))
             {
                 Log("ReadBefore 成功");
                 UpdateBeforeMetadata();
@@ -451,15 +464,17 @@ namespace GMTI2CUpdater
                 int baseAddr = image.MinAddress;
                 int size = image.MaxAddress - image.MinAddress + 1;
 
+                int bufferSize = image.MaxAddress + 1;
+
                 BaseAddress = baseAddr;
                 TotalSize = size;
 
                 // 準備 Target buffer & DefinedMap
                 byte fill = GetFillByte();
-                var buffer = new byte[size];
-                var defined = new bool[size];
+                var buffer = new byte[bufferSize];
+                var defined = new bool[bufferSize];
 
-                for (int i = 0; i < size; i++)
+                for (int i = 0; i < bufferSize; i++)
                 {
                     buffer[i] = fill;
                     defined[i] = false;   // 預設都是「未定義」 → HexView 顯示 XX
@@ -469,9 +484,10 @@ namespace GMTI2CUpdater
                 foreach (var kv in image.Data)
                 {
                     int absoluteAddress = kv.Key;
-                    int offset = absoluteAddress - baseAddr;
+                    //int offset = absoluteAddress - baseAddr;
+                    int offset = absoluteAddress;
 
-                    if (offset < 0 || offset >= size)
+                    if (offset < 0 || offset >= bufferSize)
                         continue; // 理論上不會發生
 
                     buffer[offset] = kv.Value;
@@ -479,7 +495,7 @@ namespace GMTI2CUpdater
                 }
 
                 TargetData = buffer;
-                TargetDefinedMap = defined;
+                TargetDefinedMap = BeforeDefinedMap = AfterDefinedMap = defined;
                 UpdateTargetMetadata();
 
                 ShowDiffWithBefore = true;
@@ -532,7 +548,7 @@ namespace GMTI2CUpdater
 
             if (TryPerformWithAdapter(nameof(Update), deviceaddress, adapter =>
                 ExecuteWithOptionalLockCommands(adapter, deviceaddress, lockCommands, innerAdapter =>
-                    WriteDiffBytes(innerAdapter, deviceaddress, (byte)BaseAddress, BeforeData, TargetData))))
+                    WriteDiffBytes(innerAdapter, deviceaddress, 0, BeforeData, TargetData))))
             {
                 Log("Update 成功");
                 Progress = 100;
@@ -631,7 +647,7 @@ namespace GMTI2CUpdater
             var deviceaddress = SelectedDeviceAddress;
 
             if (TryPerformWithAdapter(nameof(ReadAfter), deviceaddress, adapter =>
-                AfterData = adapter.ReadI2CByteIndex(deviceaddress, (byte)BaseAddress, TotalSize)))
+                AfterData = adapter.ReadI2CByteIndex(deviceaddress, 0, TotalSize + BaseAddress)))
             {
                 UpdateAfterMetadata();
                 Log("ReadAfter 成功");
@@ -649,6 +665,37 @@ namespace GMTI2CUpdater
         }
         [RelayCommand]
         /// <summary>
+        /// 依設定檔定義的命令觸發回讀 EEPROM 的流程。
+        /// </summary>
+        private void ResetEEPROM()
+        {
+            var resetEEPROMIndex = ReadIniHexByte("I2CSpec", "ResetEEPROMIndex");
+            var resetEEPROMCMD = ReadIniHexByte("I2CSpec", "ResetEEPROMCMD");
+            var lockCommands = ReadLockCommands();
+            if (resetEEPROMIndex == null || resetEEPROMCMD == null)
+            {
+                Log($"請先在config.ini設定燒錄的Command參數");
+                return;
+            }
+
+            if (!EnsureOperationReady(requireSize: false))
+            {
+                return;
+            }
+
+            var deviceaddress = SelectedDeviceAddress;
+
+            if (TryPerformWithAdapter(nameof(ResetEEPROM), deviceaddress, adapter =>
+                ExecuteWithOptionalLockCommands(adapter, deviceaddress, lockCommands, innerAdapter =>
+                    innerAdapter.WriteI2CByteIndex(deviceaddress, resetEEPROMIndex.Value, [resetEEPROMCMD.Value]))))
+            {
+                Log("NVRAM回讀 成功");
+            }
+            ReadAfter();
+        }
+
+        [RelayCommand]
+        /// <summary>
         /// 依設定檔定義的命令觸發燒錄 EEPROM 的流程。
         /// </summary>
         private void WriteEEPROM()
@@ -656,8 +703,6 @@ namespace GMTI2CUpdater
             var writeEEPROMIndex = ReadIniHexByte("I2CSpec", "WriteEEPROMIndex");
             var writeEEPROMCMD = ReadIniHexByte("I2CSpec", "WriteEEPROMCMD");
             var lockCommands = ReadLockCommands();
-            //byte ResetEEPROMIndex = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMIndex", "Null"));
-            //byte ResetEEPROMCMD = HexHelper.ParseHexByte(ini.Get("I2CSpec", "ResetEEPROMCMD", "Null"));
 
             if (writeEEPROMIndex == null || writeEEPROMCMD == null)
             {
@@ -676,7 +721,7 @@ namespace GMTI2CUpdater
                 ExecuteWithOptionalLockCommands(adapter, deviceaddress, lockCommands, innerAdapter =>
                     innerAdapter.WriteI2CByteIndex(deviceaddress, writeEEPROMIndex.Value, [writeEEPROMCMD.Value]))))
             {
-                Log("燒錄 成功");
+                Log("NVRAM燒錄 成功");
             }
         }
         [RelayCommand]
@@ -705,6 +750,7 @@ namespace GMTI2CUpdater
             {
                 Log($"Step5：執行燒錄");
                 WriteEEPROM();
+                ResetEEPROM();
             }
             else
             {
@@ -908,7 +954,7 @@ namespace GMTI2CUpdater
         /// <summary>
         /// 將訊息附上時間戳記後寫入 Log 集合，供 UI 即時顯示。
         /// </summary>
-        private void Log(string message)
+        public void Log(string message)
         {
             LogItems.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
         }

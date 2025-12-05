@@ -379,7 +379,8 @@ namespace GMTI2CUpdater
             var highlight = HighlightDiffSource;
             bool showDiff = ShowDiff;
             int length = data.Length;
-            int baseAddr = BaseAddress;
+            //int baseAddr = BaseAddress;
+            int baseAddr = 0;
 
             var definedMap = DefinedMap; // 可能是 null
 

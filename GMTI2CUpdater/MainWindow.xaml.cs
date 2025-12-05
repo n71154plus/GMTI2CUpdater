@@ -1,4 +1,7 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
+using System.Windows.Interop;
+using GMTI2CUpdater.Service;
 
 namespace GMTI2CUpdater
 {
@@ -7,6 +10,7 @@ namespace GMTI2CUpdater
     /// </summary>
     public partial class MainWindow : Window
     {
+        private UsbDeviceNotifier? _usbNotifier;
         /// <summary>
         /// 初始化主視窗並套用 XAML 定義的 UI 元件。
         /// </summary>
@@ -62,5 +66,62 @@ namespace GMTI2CUpdater
                 vm.LoadHexFromFile(filePath);
             }
         }
-}
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            var source = (HwndSource)PresentationSource.FromVisual(this)!;
+
+            _usbNotifier = new UsbDeviceNotifier(source.Handle);
+            source.AddHook(_usbNotifier.WndProc);
+
+            _usbNotifier.UsbAttached += (s, path) =>
+            {
+                // 這裡就是 USB 插入事件
+                // path 會是像 \\?\USB#VID_XXXX&PID_YYYY#... 這樣的裝置路徑
+                Dispatcher.Invoke(() =>
+                {
+                    if (DataContext is MainWindowViewModel vm)
+                    {
+                        string lower = path.ToLowerInvariant();
+                        if (lower.Contains("vid_04b4") && lower.Contains("pid_f232"))
+                        {
+                            Thread.Sleep(1000);
+                            vm.RefreshUsbAdapter();
+                            vm.Log("偵測到Usb I2C Adapter:CY8C24894 USB裝置Plug");
+                        }
+
+                    }
+
+                });
+            };
+
+            _usbNotifier.UsbRemoved += (s, path) =>
+            {
+                // 這裡就是 USB 拔除事件
+                Dispatcher.Invoke(() =>
+                {
+                    if (DataContext is MainWindowViewModel vm)
+                    {
+                        string lower = path.ToLowerInvariant();
+                        if (lower.Contains("vid_04b4") && lower.Contains("pid_f232"))
+                        {
+                            Thread.Sleep(1000);
+                            vm.RefreshUsbAdapter();
+                            vm.Log("偵測到Usb I2C Adapter:CY8C24894 USB裝置UnPlug");
+                        }
+
+                    }
+                });
+            };
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _usbNotifier?.Dispose();
+            _usbNotifier = null;
+            base.OnClosed(e);
+        }
+
+    }
 }

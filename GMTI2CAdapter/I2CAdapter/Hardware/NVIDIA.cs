@@ -18,7 +18,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private NvAPI_InitializeDelegate _nvInitialize = null!;
         private NvAPI_EnumPhysicalGPUsDelegate _nvEnumPhysicalGPUs = null!;
         private NvAPI_EnumNvidiaDisplayHandleDelegate _nvEnumNvidiaDisplayHandle = null!;
-        private NvAPI_EnumNvidiaUnAttachedDisplayHandleDelegate _nvEnummNvidiaUnAttachedDisplayHandle = null!;
         private NvAPI_GetAssociatedDisplayOutputIdDelegate _nvGetAssociatedDisplayOutputId = null!;
         private NvAPI_GetAssociatedNvidiaDisplayHandleDelegate _nvGetAssociatedNvidiaDisplayHandle = null!;
         private NvAPI_GetDisplayPortInfoDelegate _nvGetDisplayPortInfo = null!;

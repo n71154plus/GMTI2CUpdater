@@ -95,7 +95,7 @@
                     </ComboBox.Style>
                 </ComboBox>
                 <TextBlock Text="Device Addr："
-                           Margin="12,0,4,0"
+                           Margin="4,0,4,0"
                            VerticalAlignment="Center"/>
                 <ComboBox Width="Auto"
                           ItemsSource="{Binding DeviceAddressCollection}"
@@ -110,34 +110,37 @@
                 </ComboBox>
 
                 <TextBlock Text="Total Size："
-                           Margin="12,0,4,0"
+                           Margin="4,0,4,0"
                            VerticalAlignment="Center"/>
                 <TextBlock Width="Auto"
                            Text="{Binding TotalSize}"
                            VerticalAlignment="Center"
                            ToolTip="Total Bytes"/>
 
-                <Separator Margin="12,0"
+                <Separator Margin="4,0"
                            Width="1"/>
 
                 <!-- 主要操作按鈕 -->
                 <Button Content="1：載入欲更新資料(HEX)"
-                        Margin="4,0,0,0"
+                        Margin="1,0,0,1"
                         Command="{Binding LoadHexCommand}"/>
                 <Button Content="2：讀取目前資料"
-                        Margin="8,0,0,0"
+                        Margin="1,0,0,1"
                         Command="{Binding ReadBeforeCommand}"/>
                 <Button Content="3：開始更新"
-                        Margin="4,0,0,0"
+                        Margin="1,0,0,1"
                         Command="{Binding UpdateCommand}"/>
                 <Button Content="4：更新後回讀"
-                        Margin="4,0,0,0"
+                        Margin="1,0,0,1"
                         Command="{Binding ReadAfterCommand}"/>
                 <Button Content="5：燒錄"
-                        Margin="4,0,0,0"
+                        Margin="1,0,0,1"
                         Command="{Binding WriteEEPROMCommand}"/>
-                <Button Content="6：Apply(1~5)"
-                        Margin="4,0,0,0"
+                <Button Content="6.Reset(NVRAM回讀)"
+                        Margin="1,0,0,1"
+                        Command="{Binding ResetEEPROMCommand}"/>
+                <Button Content="7：Apply(1~6)"
+                        Margin="1,0,0,1"
                         Command="{Binding ApplyAllCommand}"/>
             </StackPanel>
         </Border>
