@@ -20,7 +20,6 @@
         <PackageReference Include="Costura.Fody" Version="6.0.0" PrivateAssets="all" />
         <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
-        <PackageReference Include="NCalcSync" Version="5.7.0" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="config.ini">

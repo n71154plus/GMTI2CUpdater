@@ -393,6 +393,7 @@ namespace GMTI2CUpdater
         /// </summary>
         private void ReadBefore()
         {
+            BeforeData = null;
             if (!EnsureOperationReady())
             {
                 return;
@@ -441,6 +442,8 @@ namespace GMTI2CUpdater
         /// </summary>
         public void LoadHexFromFile(string filePath)
         {
+            TargetData = null;
+            TargetDefinedMap = BeforeDefinedMap = AfterDefinedMap = null;
             if (string.IsNullOrWhiteSpace(filePath))
                 return;
 
@@ -639,6 +642,7 @@ namespace GMTI2CUpdater
         /// </summary>
         private void ReadAfter()
         {
+            AfterData = null;
             if (!EnsureOperationReady())
             {
                 return;

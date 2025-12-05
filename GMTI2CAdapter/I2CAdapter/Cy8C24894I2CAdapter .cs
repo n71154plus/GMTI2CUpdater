@@ -17,6 +17,13 @@ namespace GMTI2CUpdater.I2CAdapter
         private const int ReportLength = 65;
         private const int MaxI2CChunk = 32;
 
+        private const byte I2cWriteNotLast = 0x02;
+        private const byte I2cWriteLast = 0x0A;
+        private const byte I2CWriteStop = 0x08;
+        private const byte I2CReadeStop = 0x09;
+        private const byte I2cReadLast = 0x0B;
+        private const byte I2cReadNotLast = 0x03;
+
         private readonly HidDevice _hid;
         private readonly I2C_Frequency _frequency;
 
@@ -33,7 +40,7 @@ namespace GMTI2CUpdater.I2CAdapter
             : base(info)
         {
             _frequency = frequency;
-            _hid = new HidDevice(vendorId, productId, ReportLength, timeoutMs: 2000);
+            _hid = new HidDevice(vendorId, productId, ReportLength, timeoutMs: 500);
         }
 
         /// <summary>
@@ -61,22 +68,31 @@ namespace GMTI2CUpdater.I2CAdapter
 
             if (_initialized)
                 return;
-
+            _ = _hid.Read(_input, ReportLength, out _);
             // 第一包初始化指令（依你原本的協定）
             Array.Clear(_output, 0, _output.Length);
+
+
             _output[0] = 0;      // Report ID
-            _output[1] = 0x0A;
-            _output[2] = 0x01;
-            _output[3] = 0x80;
+            _output[1] = 0x10;
+            _output[2] = 0x00;
+            _output[3] = 0x00;
             _output[4] = 0x00;
 
             if (!_hid.Write(_output, ReportLength, out _))
             {
-                Thread.Sleep(1000);
-                if (!_hid.Write(_output, ReportLength, out _))
-                {
-                    throw new Exception("CY8C24894 初始化第一個指令失敗。");
-                }
+                throw new Exception("CY8C24894 0x0A初始化第一個指令失敗。");
+            }
+
+            _output[0] = 0;      // Report ID
+            _output[1] = 0x0A;
+            _output[2] = 0x01;
+            _output[3] = 0x80;
+            _output[4] = 0x02;
+
+            if (!_hid.Write(_output, ReportLength, out _))
+            {
+                throw new Exception("CY8C24894 0x0A初始化第一個指令失敗。");
             }
 
 
@@ -87,9 +103,8 @@ namespace GMTI2CUpdater.I2CAdapter
 
             if (!_hid.Write(_output, ReportLength, out _))
                 throw new Exception("CY8C24894 設定頻率失敗(Write)。");
+            _ = _hid.Read(_input, ReportLength, out _);
 
-            if (!_hid.Read(_input, ReportLength, out _))
-                throw new Exception("CY8C24894 設定頻率後讀取失敗(Read)。");
 
             _initialized = true;
         }
@@ -173,7 +188,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     Array.Clear(_input, 0, _input.Length);
 
                     _output[num++] = 0; // Report ID
-                    _output[num++] = 10;
+                    _output[num++] = I2cWriteLast;
                     _output[num++] = (byte)(1u + writeDataArray.Length);
                     _output[num++] = (byte)(devAddress >> 1);
                     _output[num++] = regAddress;
@@ -198,7 +213,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     Array.Clear(_output, 0, _output.Length);
                     Array.Clear(_input, 0, _input.Length);
                     _output[num++] = 0;
-                    _output[num++] = 2;
+                    _output[num++] = I2cWriteNotLast;
                     _output[num++] = 1;
                     _output[num++] = (byte)(devAddress >> 1);
                     _output[num++] = regAddress;
@@ -244,7 +259,7 @@ namespace GMTI2CUpdater.I2CAdapter
                         Array.Clear(_output, 0, _output.Length);
                         Array.Clear(_input, 0, _input.Length);
                         _output[num++] = 0;
-                        _output[num++] = 8;
+                        _output[num++] = I2CWriteStop;
                         _output[num++] = (byte)remain;
 
                         for (int n = 0; n < remain; n++)
@@ -280,7 +295,7 @@ namespace GMTI2CUpdater.I2CAdapter
                 Array.Clear(_output, 0, _output.Length);
                 Array.Clear(_input, 0, _input.Length);
                 _output[num++] = 0;
-                _output[num++] = 2;
+                _output[num++] = I2cWriteNotLast;
                 _output[num++] = 1;
                 _output[num++] = (byte)(devAddress >> 1);
                 _output[num++] = regAddress;
@@ -294,7 +309,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     Array.Clear(_output, 0, _output.Length);
                     Array.Clear(_input, 0, _input.Length);
                     _output[num++] = 0;
-                    _output[num++] = 0x08;
+                    _output[num++] = I2CWriteStop;
                     _hid.Write(_output, ReportLength, out _);
                     _hid.Read(_input, ReportLength, out _);
                     throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
@@ -306,7 +321,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     Array.Clear(_output, 0, _output.Length);
                     Array.Clear(_input, 0, _input.Length);
                     _output[num++] = 0;
-                    _output[num++] = 11;
+                    _output[num++] = I2cReadLast;
                     _output[num++] = (byte)readDataArray.Length;
                     _output[num++] = (byte)(devAddress >> 1);
 
@@ -337,7 +352,7 @@ namespace GMTI2CUpdater.I2CAdapter
 
                         if (k == 0)
                         {
-                            _output[num++] = 3;
+                            _output[num++] = I2cReadNotLast;
                             _output[num++] = MaxI2CChunk;
                             _output[num++] = (byte)(devAddress >> 1);
                         }
@@ -362,7 +377,7 @@ namespace GMTI2CUpdater.I2CAdapter
                         Array.Clear(_output, 0, _output.Length);
                         Array.Clear(_input, 0, _input.Length);
                         _output[num++] = 0;
-                        _output[num++] = 9;
+                        _output[num++] = I2CReadeStop;
                         _output[num++] = (byte)remain;
 
                         _hid.Write(_output, ReportLength, out _);
