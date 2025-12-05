@@ -1,88 +1,186 @@
 using Microsoft.Win32.SafeHandles;
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Security.Permissions;
-using System.Threading;
 
 namespace GMTI2CUpdater.I2CAdapter
 {
     public static class HidDevicePInvoke
     {
-        [DllImport("Kernel32.dll")]
-        internal static extern CySafeFileHandle CreateFile([In] byte[] filename, [In] int fileaccess, [In] int fileshare, [In] int lpSecurityattributes, [In] int creationdisposition, [In] int flags, [In] IntPtr template);
+        #region 常數
 
-        [DllImport("Kernel32.dll", SetLastError = true)]
-        internal static extern bool ReadFile([In] CySafeFileHandle hDevice, [In][Out] byte[] lpBuffer, [In] int nNumberOfBytesToRead, [In][Out] ref int lpNumberOfBytesRead, [Out] IntPtr lpOverlapped);
+        public const uint GENERIC_READ = 0x80000000;
+        public const uint GENERIC_WRITE = 0x40000000;
 
-        [DllImport("Kernel32.dll", SetLastError = true)]
-        internal static extern bool WriteFile([In] CySafeFileHandle hDevice, [In] byte[] lpBuffer, [In] int nNumberOfBytesToWrite, [In][Out] ref int lpNumberOfBytesWritten, [Out] IntPtr lpOverlapped);
+        public const uint FILE_SHARE_READ = 0x00000001;
+        public const uint FILE_SHARE_WRITE = 0x00000002;
 
-        [DllImport("Kernel32.dll")]
-        public static extern IntPtr CreateEvent([In] uint lpEventAttributes, [In] uint bManualReset, [In] uint bInitialState, [In] uint lpName);
+        public const uint OPEN_EXISTING = 3;
+        public const uint FILE_FLAG_OVERLAPPED = 0x40000000;
+
+        public const uint DIGCF_DEFAULT = 0x00000001;
+        public const uint DIGCF_PRESENT = 0x00000002;
+        public const uint DIGCF_ALLCLASSES = 0x00000004;
+        public const uint DIGCF_PROFILE = 0x00000008;
+        public const uint DIGCF_DEVICEINTERFACE = 0x00000010;
+
+        #endregion
+
+        #region Kernel32
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        internal static extern CySafeFileHandle CreateFile(
+            string lpFileName,
+            uint dwDesiredAccess,
+            uint dwShareMode,
+            IntPtr lpSecurityAttributes,
+            uint dwCreationDisposition,
+            uint dwFlagsAndAttributes,
+            IntPtr hTemplateFile);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern bool CloseHandle([In] IntPtr hDevice);
+        internal static extern bool ReadFile(
+            CySafeFileHandle hFile,
+            [In, Out] byte[] lpBuffer,
+            int nNumberOfBytesToRead,
+            ref int lpNumberOfBytesRead,
+            IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern int WaitForSingleObject([In] IntPtr h, [In] uint milliseconds);
+        internal static extern bool WriteFile(
+            CySafeFileHandle hFile,
+            byte[] lpBuffer,
+            int nNumberOfBytesToWrite,
+            ref int lpNumberOfBytesWritten,
+            IntPtr lpOverlapped);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        internal static extern IntPtr CreateEvent(
+            IntPtr lpEventAttributes,
+            bool bManualReset,
+            bool bInitialState,
+            string? lpName);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern bool GetOverlappedResult([In] CySafeFileHandle h, [In] byte[] lpOverlapped, [In][Out] ref uint bytesXferred, [In] uint bWait);
+        internal static extern bool CloseHandle(IntPtr hObject);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern bool CancelIo([In] CySafeFileHandle h);
+        internal static extern uint WaitForSingleObject(
+            IntPtr hHandle,
+            uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool GetOverlappedResult(
+            CySafeFileHandle hFile,
+            IntPtr lpOverlapped,
+            out uint lpNumberOfBytesTransferred,
+            bool bWait);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool CancelIo(CySafeFileHandle hFile);
+
+        #endregion
+
+        #region SetupAPI
+
+        [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        internal static extern IntPtr SetupDiGetClassDevs(
+            ref Guid ClassGuid,
+            string? Enumerator,
+            IntPtr hwndParent,
+            uint Flags);
 
         [DllImport("setupapi.dll", SetLastError = true)]
-        internal static extern IntPtr SetupDiGetClassDevs([In] ref Guid ClassGuid, [In] byte[] Enumerator, [In] IntPtr hwndParent, [In] uint Flags);
+        internal static extern bool SetupDiEnumDeviceInterfaces(
+            IntPtr DeviceInfoSet,
+            IntPtr DeviceInfoData,
+            ref Guid InterfaceClassGuid,
+            uint MemberIndex,
+            ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
+
+        [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        internal static extern bool SetupDiGetDeviceInterfaceDetail(
+            IntPtr DeviceInfoSet,
+            ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData,
+            ref SP_DEVICE_INTERFACE_DETAIL_DATA DeviceInterfaceDetailData,
+            int DeviceInterfaceDetailDataSize,
+            out int RequiredSize,
+            IntPtr DeviceInfoData);
 
         [DllImport("setupapi.dll", SetLastError = true)]
-        internal static extern bool SetupDiEnumDeviceInterfaces([In] IntPtr DeviceInfoSet, [In] uint DeviceInfoData, [In] ref Guid InterfaceClassGuid, [In] uint MemberIndex, [Out] SP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
+        internal static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
 
-        [DllImport("setupapi.dll", SetLastError = true)]
-        internal static extern bool SetupDiGetDeviceInterfaceDetail([In] IntPtr DeviceInfoSet, [In] SP_DEVICE_INTERFACE_DATA DeviceInterfaceData, [Out] byte[]? DeviceInterfaceDetailData, [In] int DeviceInterfaceDetailDataSize, [In][Out] ref int RequiredSize, [Out] SP_DEVINFO_DATA? DeviceInfoData);
+        #endregion
 
-        [DllImport("setupapi.dll")]
-        internal static extern bool SetupDiDestroyDeviceInfoList([In] IntPtr DeviceInfoSet);
+        #region HID.DLL
 
         [DllImport("hid.dll", SetLastError = true)]
-        internal unsafe static extern bool HidD_GetFeature([In] CySafeFileHandle hDevice, [In, Out] byte[] lpFeatureData, [In] int bufLen);
-        [DllImport("hid.dll", SetLastError = true)]
-        internal unsafe static extern bool HidD_SetFeature([In] CySafeFileHandle hDevice, [In] byte[] lpFeatureData, [In] int bufLen);
+        internal static extern bool HidD_GetFeature(
+            CySafeFileHandle hDevice,
+            [In, Out] byte[] lpFeatureData,
+            int bufLen);
 
         [DllImport("hid.dll", SetLastError = true)]
-        internal static extern void HidD_GetHidGuid([In][Out] ref Guid HidGuid);
+        internal static extern bool HidD_SetFeature(
+            CySafeFileHandle hDevice,
+            [In] byte[] lpFeatureData,
+            int bufLen);
 
-        internal static CySafeFileHandle GetDeviceHandle(string devPath, bool bOverlapped)
+        [DllImport("hid.dll", SetLastError = true)]
+        internal static extern void HidD_GetHidGuid(ref Guid HidGuid);
+
+        #endregion
+
+        /// <summary>
+        /// 依 device path 開啟 HID 裝置，必要時指定 overlapped。
+        /// </summary>
+        internal static CySafeFileHandle GetDeviceHandle(string devPath, bool overlapped)
         {
-            int accessMode = 3;
-            int length = devPath.Length;
-            byte[] array = new byte[length + 1];
-            for (int i = 0; i < length; i++)
+            uint flags = overlapped ? FILE_FLAG_OVERLAPPED : 0;
+
+            // 先試著用 R/W 開啟
+            var handle = CreateFile(
+                devPath,
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                IntPtr.Zero,
+                OPEN_EXISTING,
+                flags,
+                IntPtr.Zero);
+
+            if (handle.IsInvalid)
             {
-                array[i] = (byte)devPath[i];
+                // 再試試只讀
+                handle = CreateFile(
+                    devPath,
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    flags,
+                    IntPtr.Zero);
             }
 
-            accessMode = 3;
-            CySafeFileHandle cySafeFileHandle = CreateFile(array, accessMode, 3, 0, 3, bOverlapped ? 1073741824 : 0, IntPtr.Zero);
-            if (cySafeFileHandle.IsInvalid)
+            if (handle.IsInvalid)
             {
-                accessMode = 1;
-                cySafeFileHandle = CreateFile(array, accessMode, 1, 0, 3, bOverlapped ? 1073741824 : 0, IntPtr.Zero);
+                // 再試試 0 存取
+                handle = CreateFile(
+                    devPath,
+                    0,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    flags,
+                    IntPtr.Zero);
             }
 
-            if (cySafeFileHandle.IsInvalid)
-            {
-                accessMode = 0;
-                cySafeFileHandle = CreateFile(array, accessMode, 3, 0, 3, bOverlapped ? 1073741824 : 0, IntPtr.Zero);
-            }
-            Thread.Sleep(500);
-            return cySafeFileHandle;
+            // 部分裝置剛開啟時會需要一點時間 ready，保留你原本的 delay（可以視情況調整）
+            //Thread.Sleep(100);
+            return handle;
         }
-
     }
+
     [SecurityPermission(SecurityAction.Demand, UnmanagedCode = true)]
     public sealed class CySafeFileHandle : SafeHandleZeroOrMinusOneIsInvalid
     {
@@ -97,44 +195,55 @@ namespace GMTI2CUpdater.I2CAdapter
             return HidDevicePInvoke.CloseHandle(handle);
         }
     }
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal class SP_DEVICE_INTERFACE_DATA
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SP_DEVICE_INTERFACE_DATA
     {
         public int cbSize;
-
         public Guid InterfaceClassGuid;
-
         public uint Flags;
-
         public IntPtr Reserved;
+
         public SP_DEVICE_INTERFACE_DATA()
         {
-            // 自動填入結構長度
             cbSize = Marshal.SizeOf(typeof(SP_DEVICE_INTERFACE_DATA));
+            InterfaceClassGuid = Guid.Empty;
+            Flags = 0;
+            Reserved = IntPtr.Zero;
         }
     }
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal class SP_DEVINFO_DATA
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    internal struct SP_DEVICE_INTERFACE_DETAIL_DATA
     {
         public int cbSize;
 
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string DevicePath;
+
+        public static int CalcCbSize()
+        {
+            // 官方建議：32-bit = 4 + 2, 64-bit = 8
+            return IntPtr.Size == 8 ? 8 : 4 + Marshal.SystemDefaultCharSize;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SP_DEVINFO_DATA
+    {
+        public int cbSize;
         public Guid ClassGuid;
-
         public uint DevInst;
-
         public IntPtr Reserved;
     }
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct OVERLAPPED
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct OVERLAPPED
     {
         public IntPtr Internal;
-
         public IntPtr InternalHigh;
-
-        public uint UnionPointerOffsetLow;
-
-        public uint UnionPointerOffsetHigh;
-
+        public uint Offset;
+        public uint OffsetHigh;
         public IntPtr hEvent;
     }
 }

@@ -8,17 +8,18 @@ namespace GMTI2CUpdater.I2CAdapter
     /// 封裝單一 HID 裝置的尋找、開啟與 Overlapped 讀寫。
     /// 依 VendorId / ProductId 找到第一個符合的裝置。
     /// </summary>
-    public unsafe sealed class HidDevice : IDisposable
+    public sealed class HidDevice : IDisposable
     {
-        private const uint WaitTimeout = 258;     // WAIT_TIMEOUT
-        private const int ERROR_IO_PENDING = 997; // ERROR_IO_PENDING
+        private const uint WAIT_TIMEOUT = 258;      // WAIT_TIMEOUT
+        private const int ERROR_IO_PENDING = 997;   // ERROR_IO_PENDING
+        private const int ERROR_INVALID_HANDLE = 6; // ERROR_INVALID_HANDLE
+        private const int ERROR_OPERATION_ABORTED = 995;
 
         private readonly ushort _vendorId;
         private readonly ushort _productId;
         private readonly uint _timeoutMs;
         private readonly int _reportLength;
 
-        // 允許一開始為 null，配合 FindDevice / Open 設定
         private string? _devicePath;
         private CySafeFileHandle? _handle;
         private uint _lastError;
@@ -38,17 +39,14 @@ namespace GMTI2CUpdater.I2CAdapter
         /// </summary>
         public static bool Exists(ushort vendorId, ushort productId)
         {
-            using (var dev = new HidDevice(vendorId, productId, reportLength: 65))
-            {
-                return dev.FindDevice();
-            }
+            using var dev = new HidDevice(vendorId, productId, reportLength: 65);
+            return dev.FindDevice();
         }
 
         public uint LastError => _lastError;
 
         public bool IsOpen => _handle != null && !_handle.IsInvalid;
 
-        // 對外仍然提供非 nullable string，如果尚未找到裝置，回傳空字串。
         public string DevicePath => _devicePath ?? string.Empty;
 
         /// <summary>
@@ -59,75 +57,91 @@ namespace GMTI2CUpdater.I2CAdapter
             _devicePath = null;
             bool success = false;
 
-            string strSearch = string.Format("vid_{0:x4}&pid_{1:x4}", _vendorId, _productId);
+            string search = $"vid_{_vendorId:x4}&pid_{_productId:x4}";
+
             Guid hidGuid = Guid.Empty;
             HidDevicePInvoke.HidD_GetHidGuid(ref hidGuid);
 
-            // 第二個參數允許 NULL，interop 宣告若是非 nullable，這裡用 null! 告訴編譯器我們確定這樣可以
-            IntPtr hInfoSet = HidDevicePInvoke.SetupDiGetClassDevs(ref hidGuid, null!, IntPtr.Zero, 2u | 16u);
+            IntPtr hInfoSet = HidDevicePInvoke.SetupDiGetClassDevs(
+                ref hidGuid,
+                null,
+                IntPtr.Zero,
+                HidDevicePInvoke.DIGCF_PRESENT | HidDevicePInvoke.DIGCF_DEVICEINTERFACE);
+
+            if (hInfoSet == IntPtr.Zero || hInfoSet.ToInt64() == -1)
+                return false;
+
             try
             {
                 var ifaceData = new SP_DEVICE_INTERFACE_DATA();
-                int index = 0;
+                uint index = 0;
 
-                while (HidDevicePInvoke.SetupDiEnumDeviceInterfaces(hInfoSet, 0, ref hidGuid, (uint)index, ifaceData))
+                while (HidDevicePInvoke.SetupDiEnumDeviceInterfaces(
+                           hInfoSet,
+                           IntPtr.Zero,
+                           ref hidGuid,
+                           index,
+                           ref ifaceData))
                 {
-                    string? path = GetDevicePath(hInfoSet, ifaceData);
+                    string? path = GetDevicePath(hInfoSet, ref ifaceData);
 
-                    // path is { Length: > 0 } p 意思是：
-                    // - path != null
-                    // - path.Length > 0
-                    // - 並且在 if 裡用 p 當作「非 nullable string」
-                    if (path is { Length: > 0 } p &&
-                        p.IndexOf(strSearch, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (!string.IsNullOrEmpty(path) &&
+                        path.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        _devicePath = p;
+                        _devicePath = path;
                         success = true;
                         break;
                     }
 
                     index++;
                 }
-
             }
             finally
             {
-                if (hInfoSet != IntPtr.Zero)
-                {
-                    HidDevicePInvoke.SetupDiDestroyDeviceInfoList(hInfoSet);
-                }
+                HidDevicePInvoke.SetupDiDestroyDeviceInfoList(hInfoSet);
             }
 
             return success;
         }
 
-        private static string? GetDevicePath(IntPtr hInfoSet, SP_DEVICE_INTERFACE_DATA oInterface)
+        private static string? GetDevicePath(IntPtr hInfoSet, ref SP_DEVICE_INTERFACE_DATA ifaceData)
         {
-            int requiredSize = 0;
-            int requiredSize2 = 0;
-
-            if (!HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(hInfoSet, oInterface, null, 0, ref requiredSize, null))
+            // 先問需要多少 buffer
+            int requiredSize;
+            var dummyDetail = new SP_DEVICE_INTERFACE_DETAIL_DATA
             {
-                byte[] detailData = new byte[requiredSize];
-                // 第一個 int 是 cbSize
-                detailData[0] = (byte)(IntPtr.Size == 8 ? 8 : 5);
+                cbSize = SP_DEVICE_INTERFACE_DETAIL_DATA.CalcCbSize()
+            };
 
-                if (HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(hInfoSet, oInterface, detailData, requiredSize, ref requiredSize2, null))
-                {
-                    char[] pathChars = new char[requiredSize2 - 3];
-                    for (int i = 0; i < requiredSize2 - 4; i++)
-                    {
-                        pathChars[i] = (char)detailData[i + 4];
-                        pathChars[i + 1] = '\0';
-                    }
-
-                    return new string(pathChars);
-                }
+            if (!HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(
+                    hInfoSet,
+                    ref ifaceData,
+                    ref dummyDetail,
+                    0,
+                    out requiredSize,
+                    IntPtr.Zero))
+            {
+                // 這裡預期會失敗，僅是拿 requiredSize
             }
 
-            return null;
-        }
+            var detail = new SP_DEVICE_INTERFACE_DETAIL_DATA
+            {
+                cbSize = SP_DEVICE_INTERFACE_DETAIL_DATA.CalcCbSize()
+            };
 
+            if (!HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(
+                    hInfoSet,
+                    ref ifaceData,
+                    ref detail,
+                    Marshal.SizeOf(detail),
+                    out requiredSize,
+                    IntPtr.Zero))
+            {
+                return null;
+            }
+
+            return detail.DevicePath;
+        }
 
         /// <summary>
         /// 確保已開啟 HID 裝置（必要時自動 FindDevice）。
@@ -146,17 +160,14 @@ namespace GMTI2CUpdater.I2CAdapter
             if (string.IsNullOrEmpty(_devicePath))
                 return false;
 
-            // 先存到局部變數，再用 null-forgiving 告訴編譯器這裡一定非 null
             string devPath = _devicePath!;
-            _handle = HidDevicePInvoke.GetDeviceHandle(devPath, bOverlapped: true);
+            _handle = HidDevicePInvoke.GetDeviceHandle(devPath, overlapped: true);
+
             if (_handle == null || _handle.IsInvalid)
-            {
                 return false;
-            }
 
             return true;
         }
-
 
         public void Close()
         {
@@ -174,8 +185,10 @@ namespace GMTI2CUpdater.I2CAdapter
         public bool Write(byte[] buffer, int length, out int bytesWritten)
         {
             bytesWritten = 0;
+
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (length <= 0 || length > buffer.Length) throw new ArgumentOutOfRangeException(nameof(length));
+            if (length > _reportLength) throw new ArgumentOutOfRangeException(nameof(length), "length 超過 report 長度");
 
             if (!Open())
                 return false;
@@ -190,7 +203,7 @@ namespace GMTI2CUpdater.I2CAdapter
             {
                 int tmp = 0;
                 bool ok = DoOverlappedIo(
-                    ov => HidDevicePInvoke.WriteFile(handle, buffer, length, ref tmp, (IntPtr)ov),
+                    ov => HidDevicePInvoke.WriteFile(handle, buffer, length, ref tmp, ov),
                     ref tmp);
 
                 if (ok)
@@ -199,15 +212,11 @@ namespace GMTI2CUpdater.I2CAdapter
                     return true;
                 }
 
-                if (_lastError == 995) // ERROR_OPERATION_ABORTED
+                // ERROR_OPERATION_ABORTED 可以稍等重試
+                if (_lastError == ERROR_OPERATION_ABORTED && attempt < maxAttempts)
                 {
-                    if (attempt < maxAttempts)
-                    {
-                        Thread.Sleep(50);
-                        continue;
-                    }
-
-                    return false;
+                    Thread.Sleep(50);
+                    continue;
                 }
 
                 if (attempt < maxAttempts)
@@ -228,8 +237,10 @@ namespace GMTI2CUpdater.I2CAdapter
         public bool Read(byte[] buffer, int length, out int bytesRead)
         {
             bytesRead = 0;
+
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (length <= 0 || length > buffer.Length) throw new ArgumentOutOfRangeException(nameof(length));
+            if (length > _reportLength) throw new ArgumentOutOfRangeException(nameof(length), "length 超過 report 長度");
 
             if (!Open())
                 return false;
@@ -246,7 +257,7 @@ namespace GMTI2CUpdater.I2CAdapter
                 int tmp = 0;
 
                 bool ok = DoOverlappedIo(
-                    ov => HidDevicePInvoke.ReadFile(handle, buffer, length, ref tmp, (IntPtr)ov),
+                    ov => HidDevicePInvoke.ReadFile(handle, buffer, length, ref tmp, ov),
                     ref tmp);
 
                 if (ok && tmp > 0)
@@ -255,15 +266,10 @@ namespace GMTI2CUpdater.I2CAdapter
                     return true;
                 }
 
-                if (_lastError == 995) // ERROR_OPERATION_ABORTED
+                if (_lastError == ERROR_OPERATION_ABORTED && attempt < maxAttempts)
                 {
-                    if (attempt < maxAttempts)
-                    {
-                        Thread.Sleep(50);
-                        continue;
-                    }
-
-                    return false;
+                    Thread.Sleep(50);
+                    continue;
                 }
 
                 if (attempt < maxAttempts)
@@ -278,23 +284,40 @@ namespace GMTI2CUpdater.I2CAdapter
             return false;
         }
 
-        private unsafe bool DoOverlappedIo(Func<IntPtr, bool> startIo, ref int bytesTransferred)
+        /// <summary>
+        /// 共用的 Overlapped I/O 執行流程：建立 OVERLAPPED + Event，啟動 I/O 並等待。
+        /// </summary>
+        private bool DoOverlappedIo(Func<IntPtr, bool> startIo, ref int bytesTransferred)
         {
-            byte[] ovBuffer = new byte[sizeof(OVERLAPPED)];
+            bytesTransferred = 0;
+            _lastError = 0;
 
-            fixed (byte* p = ovBuffer)
+            // 建立 Event
+            IntPtr hEvent = HidDevicePInvoke.CreateEvent(IntPtr.Zero, false, false, null);
+            if (hEvent == IntPtr.Zero || hEvent.ToInt64() == -1)
             {
-                OVERLAPPED* ov = (OVERLAPPED*)p;
-                ov->Internal = IntPtr.Zero;
-                ov->InternalHigh = IntPtr.Zero;
-                ov->UnionPointerOffsetLow = 0;
-                ov->UnionPointerOffsetHigh = 0;
-                ov->hEvent = HidDevicePInvoke.CreateEvent(0u, 0u, 0u, 0u);
+                _lastError = (uint)Marshal.GetLastWin32Error();
+                return false;
+            }
 
-                bytesTransferred = 0;
-                _lastError = 0;
+            // 配置 unmanaged OVERLAPPED 結構
+            int ovSize = Marshal.SizeOf(typeof(OVERLAPPED));
+            IntPtr pOv = Marshal.AllocHGlobal(ovSize);
 
-                bool started = startIo((IntPtr)ov);
+            try
+            {
+                var ov = new OVERLAPPED
+                {
+                    Internal = IntPtr.Zero,
+                    InternalHigh = IntPtr.Zero,
+                    Offset = 0,
+                    OffsetHigh = 0,
+                    hEvent = hEvent
+                };
+
+                Marshal.StructureToPtr(ov, pOv, false);
+
+                bool started = startIo(pOv);
                 if (!started)
                 {
                     int err = Marshal.GetLastWin32Error();
@@ -305,45 +328,51 @@ namespace GMTI2CUpdater.I2CAdapter
                     }
                 }
 
-                int wait = HidDevicePInvoke.WaitForSingleObject(ov->hEvent, _timeoutMs);
-                uint bytes = 0;
-
+                // 等待 I/O 完成或逾時
+                uint wait = HidDevicePInvoke.WaitForSingleObject(hEvent, _timeoutMs);
                 var handle = _handle;
 
-                switch (wait)
+                if (wait == 0) // WAIT_OBJECT_0
                 {
-                    case 0: // WAIT_OBJECT_0
-                        {
-                            if (handle == null || handle.IsInvalid)
-                            {
-                                _lastError = 6; // ERROR_INVALID_HANDLE
-                                return false;
-                            }
+                    if (handle == null || handle.IsInvalid)
+                    {
+                        _lastError = ERROR_INVALID_HANDLE;
+                        return false;
+                    }
 
-                            bool ok = HidDevicePInvoke.GetOverlappedResult(handle, ovBuffer, ref bytes, 0u);
-                            int err2 = Marshal.GetLastWin32Error();
-                            _lastError = (uint)err2;
-                            bytesTransferred = (int)bytes;
-                            return ok;
-                        }
+                    uint bytes = 0;
+                    bool ok = HidDevicePInvoke.GetOverlappedResult(handle, pOv, out bytes, false);
+                    _lastError = (uint)Marshal.GetLastWin32Error();
+                    bytesTransferred = (int)bytes;
+                    return ok;
+                }
 
-                    case (int)WaitTimeout:
-                        {
-                            _lastError = (uint)Marshal.GetLastWin32Error();
+                if (wait == WAIT_TIMEOUT)
+                {
+                    _lastError = WAIT_TIMEOUT;
 
-                            if (handle != null && !handle.IsInvalid)
-                            {
-                                HidDevicePInvoke.CancelIo(handle);
-                            }
+                    if (handle != null && !handle.IsInvalid)
+                    {
+                        HidDevicePInvoke.CancelIo(handle);
+                    }
 
-                            return false;
-                        }
+                    return false;
+                }
 
-                    default:
-                        {
-                            _lastError = (uint)Marshal.GetLastWin32Error();
-                            return false;
-                        }
+                // 其他錯誤
+                _lastError = (uint)Marshal.GetLastWin32Error();
+                return false;
+            }
+            finally
+            {
+                if (hEvent != IntPtr.Zero)
+                {
+                    HidDevicePInvoke.CloseHandle(hEvent);
+                }
+
+                if (pOv != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(pOv);
                 }
             }
         }

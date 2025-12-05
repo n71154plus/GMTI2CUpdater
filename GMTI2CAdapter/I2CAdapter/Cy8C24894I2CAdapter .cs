@@ -36,11 +36,11 @@ namespace GMTI2CUpdater.I2CAdapter
         public Cy8C24894Adapter(I2CAdapterInfo info,
                                 ushort vendorId,
                                 ushort productId,
-                                I2C_Frequency frequency = I2C_Frequency.F400K)
+                                I2C_Frequency frequency = I2C_Frequency.F100K)
             : base(info)
         {
             _frequency = frequency;
-            _hid = new HidDevice(vendorId, productId, ReportLength, timeoutMs: 500);
+            _hid = new HidDevice(vendorId, productId, ReportLength, timeoutMs: 200);
         }
 
         /// <summary>
@@ -65,46 +65,32 @@ namespace GMTI2CUpdater.I2CAdapter
             {
                 throw new Exception("無法連接 CY8C24894 HID 裝置，請確認治具是否連接。");
             }
-
-            if (_initialized)
-                return;
-            _ = _hid.Read(_input, ReportLength, out _);
-            // 第一包初始化指令（依你原本的協定）
-            Array.Clear(_output, 0, _output.Length);
-
-
-            _output[0] = 0;      // Report ID
-            _output[1] = 0x10;
-            _output[2] = 0x00;
-            _output[3] = 0x00;
-            _output[4] = 0x00;
-
-            if (!_hid.Write(_output, ReportLength, out _))
-            {
-                throw new Exception("CY8C24894 0x0A初始化第一個指令失敗。");
-            }
-
+            //Thread.Sleep(100);
             _output[0] = 0;      // Report ID
             _output[1] = 0x0A;
-            _output[2] = 0x01;
+            _output[2] = 0x02;
             _output[3] = 0x80;
             _output[4] = 0x02;
-
-            if (!_hid.Write(_output, ReportLength, out _))
+            Array.Clear(_input, 0, _input.Length);
+            while (_input[1] != 0x05)
             {
-                throw new Exception("CY8C24894 0x0A初始化第一個指令失敗。");
+                Thread.Sleep(100);
+                _hid.Write(_output, ReportLength, out _);
+                _ = _hid.Read(_input, ReportLength, out _);
             }
-
 
             // 設定 I2C 頻率
             Array.Clear(_output, 0, _output.Length);
             _output[0] = 0;
             _output[1] = (byte)_frequency;
-
+            Array.Clear(_input, 0, _output.Length);
             if (!_hid.Write(_output, ReportLength, out _))
+            {
+                _ = _hid.Read(_input, ReportLength, out _);
+                _hid.Close();
                 throw new Exception("CY8C24894 設定頻率失敗(Write)。");
+            }
             _ = _hid.Read(_input, ReportLength, out _);
-
 
             _initialized = true;
         }
@@ -277,6 +263,7 @@ namespace GMTI2CUpdater.I2CAdapter
                 // 視需求決定是否每次都關閉 HID。
                 // 這裡先保持開啟，讓整個 Adapter 生命週期共用一個 handle。
                 // 若你希望和舊版一樣每次都關，這裡可以呼叫 _hid.Close();
+                _hid.Close();
             }
         }
 
@@ -312,7 +299,8 @@ namespace GMTI2CUpdater.I2CAdapter
                     _output[num++] = I2CWriteStop;
                     _hid.Write(_output, ReportLength, out _);
                     _hid.Read(_input, ReportLength, out _);
-                    throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
+                    _hid.Close();
+                    throw new Exception("送Device Address找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                 }
 
                 if (readDataArray.Length <= MaxI2CChunk)
@@ -330,7 +318,8 @@ namespace GMTI2CUpdater.I2CAdapter
 
                     if (_input[1] == 0)
                     {
-                        throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
+                        _hid.Close();
+                        throw new Exception("I2C讀取Command失敗");
                     }
 
                     for (int j = 0; j < readDataArray.Length; j++)
@@ -393,6 +382,7 @@ namespace GMTI2CUpdater.I2CAdapter
             finally
             {
                 // 同上，預設不關，讓整個 adapter 生命週期共用。
+                _hid.Close();
             }
         }
 
@@ -412,6 +402,7 @@ namespace GMTI2CUpdater.I2CAdapter
 
             _hid.Write(_output, ReportLength, out _);
             _hid.Read(_input, ReportLength, out _);
+            _hid.Close();
         }
 
         private void I2C_Single_Read(byte devAddress, ref byte readData)
@@ -436,6 +427,7 @@ namespace GMTI2CUpdater.I2CAdapter
             }
 
             readData = _input[2];
+            _hid.Close();
         }
 
         #endregion

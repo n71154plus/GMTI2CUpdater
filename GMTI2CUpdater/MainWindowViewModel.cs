@@ -402,7 +402,7 @@ namespace GMTI2CUpdater
             var deviceaddress = SelectedDeviceAddress;
 
             if (TryPerformWithAdapter(nameof(ReadBefore), deviceaddress, adapter =>
-                BeforeData = adapter.ReadI2CByteIndex(deviceaddress, 0, TotalSize + BaseAddress)))
+                BeforeData =  adapter.ReadI2CByteIndex(deviceaddress, 0, TotalSize + BaseAddress)))
             {
                 Log("ReadBefore 成功");
                 UpdateBeforeMetadata();
