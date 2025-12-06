@@ -386,13 +386,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             const int ChunkSize = MaxI2cWriteChunk;
-            int offset = 0;
-
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
-                int remaining = data.Length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-
                 var io = new AuxIo
                 {
                     Display = display.MonitorUid,
@@ -412,9 +407,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
-
-                offset += currentLen;
-            }
+            });
         }
 
         /// <summary>
@@ -430,13 +423,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             const int ChunkSize = MaxI2cWriteChunk;
-            int offset = 0;
-
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
-                int remaining = data.Length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-
                 var io = new AuxIo
                 {
                     Display = display.MonitorUid,
@@ -459,9 +447,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
-
-                offset += currentLen;
-            }
+            });
         }
 
         /// <summary>
@@ -532,12 +518,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Thread.Sleep(_i2cDelayMs);
 
             // 再分段讀取
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
             {
-                int remaining = length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-                bool isLastChunk = remaining <= ChunkSize;
-
                 io = new AuxIo
                 {
                     Display = display.MonitorUid,
@@ -555,9 +537,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
 
-                Array.Copy(io.Buf, 0, result, offset, currentLen);
-                offset += currentLen;
-            }
+                return io.Buf;
+            }, result);
 
             return result;
         }
@@ -600,12 +581,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Thread.Sleep(_i2cDelayMs);
 
             // 再分段讀取
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
             {
-                int remaining = length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-                bool isLastChunk = remaining <= ChunkSize;
-
                 io = new AuxIo
                 {
                     Display = display.MonitorUid,
@@ -623,9 +600,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
 
-                Array.Copy(io.Buf, 0, result, offset, currentLen);
-                offset += currentLen;
-            }
+                return io.Buf;
+            }, result);
 
             return result;
         }

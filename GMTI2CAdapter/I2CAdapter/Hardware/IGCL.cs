@@ -643,11 +643,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             // 可用資料空間 = CtlAuxMaxDataSize - 1 (index 佔 1 byte)
             const int PayloadMax = MaxI2cWriteChunk;
 
-            int offset = 0;
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, PayloadMax, (offset, chunkLen) =>
             {
-                int remaining = data.Length - offset;
-                int chunkLen = Math.Min(PayloadMax, remaining);
                 int totalLen = 1 + chunkLen;              // index + chunk
 
                 byte effectiveIndex = (byte)(index + offset);
@@ -677,9 +674,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
-
-                offset += chunkLen;
-            }
+            });
         }
 
         // 16-bit index（大端），從 index 起連續寫入 data
@@ -697,11 +692,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             byte hi = (byte)(index >> 8);
             byte lo = (byte)(index & 0xFF);
 
-            int offset = 0;
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, PayloadMax, (offset, chunkLen) =>
             {
-                int remaining = data.Length - offset;
-                int chunkLen = Math.Min(PayloadMax, remaining);
                 int totalLen = 2 + chunkLen;              // 2 bytes index + chunk
 
                 var args = new CtlAuxAccessArgs
@@ -730,9 +722,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
-
-                offset += chunkLen;
-            }
+            });
         }
 
         // 無 index，讀取單一 byte
@@ -807,14 +797,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 2) 再分段讀資料
             const int ChunkSize = MaxI2cReadChunk;
-            int offset = 0;
-
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
             {
-                int remaining = length - offset;
-                int chunkLen = Math.Min(ChunkSize, remaining);
-                bool isLast = offset + chunkLen >= length;
-
                 var args = new CtlAuxAccessArgs
                 {
                     Size = (uint)Marshal.SizeOf(typeof(CtlAuxAccessArgs)),
@@ -838,9 +822,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
 
-                Array.Copy(args.Data, 0, result, offset, chunkLen);
-                offset += chunkLen;
-            }
+                return args.Data;
+            }, result);
 
             return result;
         }
@@ -891,14 +874,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 2) 再分段讀資料
             const int ChunkSize = MaxI2cReadChunk;
-            int offset = 0;
-
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
             {
-                int remaining = length - offset;
-                int chunkLen = Math.Min(ChunkSize, remaining);
-                bool isLast = offset + chunkLen >= length;
-
                 var args = new CtlAuxAccessArgs
                 {
                     Size = (uint)Marshal.SizeOf(typeof(CtlAuxAccessArgs)),
@@ -922,9 +899,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 if (_i2cDelayMs != 0)
                     Thread.Sleep(_i2cDelayMs);
 
-                Array.Copy(args.Data, 0, result, offset, chunkLen);
-                offset += chunkLen;
-            }
+                return args.Data;
+            }, result);
 
             return result;
         }
