@@ -2,6 +2,7 @@
 // Language: C#
 using System;
 using System.Runtime.InteropServices;
+using GMTI2CAdapter.I2CAdapter.Helper;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
@@ -248,10 +249,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         private const uint CtlAuxFlagNativeAux = 1 << 0;
         private const uint CtlAuxFlagI2CAux = 1 << 1;
         private const uint CtlAuxFlagI2CAuxMot = 1 << 2;
-
-        private const uint CtlI2CFlag1ByteIndex = 1 << 0;
-
-        private const uint CtlI2CFlag2ByteIndex = 2 << 0;
 
         private const int CtlAuxMaxDataSize = 0x0084; // 132 bytes
 
@@ -641,9 +638,9 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             // 可用資料空間 = CtlAuxMaxDataSize - 1 (index 佔 1 byte)
-            const int PayloadMax = MaxI2cWriteChunk;
+            const int ChunkSize = MaxI2cWriteChunk;
 
-            I2cChunkHelper.WriteChunks(data.Length, PayloadMax, (offset, chunkLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, chunkLen) =>
             {
                 int totalLen = 1 + chunkLen;              // index + chunk
 
@@ -686,13 +683,13 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             // 可用資料空間 = CtlAuxMaxDataSize - 2 (index 佔 2 bytes)
-            const int PayloadMax = MaxI2cWriteChunk;
+            const int ChunkSize = MaxI2cWriteChunk;
 
             // big-endian index
             byte hi = (byte)(index >> 8);
             byte lo = (byte)(index & 0xFF);
 
-            I2cChunkHelper.WriteChunks(data.Length, PayloadMax, (offset, chunkLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, chunkLen) =>
             {
                 int totalLen = 2 + chunkLen;              // 2 bytes index + chunk
 
@@ -797,7 +794,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 2) 再分段讀資料
             const int ChunkSize = MaxI2cReadChunk;
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
             {
                 var args = new CtlAuxAccessArgs
                 {
@@ -874,7 +871,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 2) 再分段讀資料
             const int ChunkSize = MaxI2cReadChunk;
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, chunkLen, isLast) =>
             {
                 var args = new CtlAuxAccessArgs
                 {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using GMTI2CAdapter.I2CAdapter.Helper;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
@@ -314,7 +315,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             // Buf 最多 16 bytes，其中 1 byte 是 index → 一次最多寫 15 bytes 資料
             const int ChunkSize = MaxI2cWriteChunk;
 
-            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
                 int totalLen = 1 + currentLen; // index + data
                 byte idx = (byte)(index + offset);
@@ -353,7 +354,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             byte hi = (byte)(index >> 8);
             byte lo = (byte)(index & 0xFF);
 
-            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
                 int totalLen = 2 + currentLen; // 2 bytes index + data
 
@@ -424,13 +425,11 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 int statusIdx = _nvDisp_DpAuxChannelControl(display.DisplayHandle, ref pIndex, sizeIdx);
 
                 HandleAuxStatus(statusIdx, ref pIndex, "NvAPI_Disp_DpAuxChannelControl(I2C WriteIndex)");
-
-
             }
 
             // 再分段讀取資料
             const int ChunkSize = MaxI2cReadChunk;
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
             {
                 var p = CreateAuxParams();
                 p.OutputId = display.MonitorUid;
@@ -486,7 +485,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 再分段讀取資料
             const int ChunkSize = MaxI2cReadChunk;
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
             {
                 var p = CreateAuxParams();
                 p.OutputId = display.MonitorUid;

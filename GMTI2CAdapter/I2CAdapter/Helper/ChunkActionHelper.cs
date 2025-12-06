@@ -1,8 +1,8 @@
 using System;
 
-namespace GMTI2CUpdater.I2CAdapter.Hardware
+namespace GMTI2CAdapter.I2CAdapter.Helper
 {
-    internal static class I2cChunkHelper
+    internal static class ChunkActionHelper
     {
         public static void WriteChunks(int dataLength, int chunkSize, Action<int, int> writeChunk)
         {

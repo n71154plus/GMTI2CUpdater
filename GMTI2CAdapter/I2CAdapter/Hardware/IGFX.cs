@@ -1,5 +1,6 @@
 ﻿
 using System.Runtime.InteropServices;
+using GMTI2CAdapter.I2CAdapter.Helper;
 
 namespace GMTI2CUpdater.I2CAdapter.Hardware
 {
@@ -386,7 +387,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             const int ChunkSize = MaxI2cWriteChunk;
-            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
                 var io = new AuxIo
                 {
@@ -423,7 +424,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return;
 
             const int ChunkSize = MaxI2cWriteChunk;
-            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
+            ChunkActionHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
                 var io = new AuxIo
                 {
@@ -496,8 +497,6 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             byte[] result = new byte[length];
             const int ChunkSize = MaxI2cReadChunk;
-            int offset = 0;
-
             // 先寫入 index（不結束 transaction）
             var io = new AuxIo
             {
@@ -518,7 +517,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Thread.Sleep(_i2cDelayMs);
 
             // 再分段讀取
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
             {
                 io = new AuxIo
                 {
@@ -581,7 +580,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 Thread.Sleep(_i2cDelayMs);
 
             // 再分段讀取
-            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
+            ChunkActionHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLastChunk) =>
             {
                 io = new AuxIo
                 {
