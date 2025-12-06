@@ -1,6 +1,7 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Threading;
+using GMTI2CUpdater.I2CAdapter.Hardware;
+using System.Runtime.InteropServices;
 
 namespace GMTI2CUpdater.I2CAdapter
 {
@@ -54,93 +55,8 @@ namespace GMTI2CUpdater.I2CAdapter
         /// </summary>
         public bool FindDevice()
         {
-            _devicePath = null;
-            bool success = false;
-
-            string search = $"vid_{_vendorId:x4}&pid_{_productId:x4}";
-
-            Guid hidGuid = Guid.Empty;
-            HidDevicePInvoke.HidD_GetHidGuid(ref hidGuid);
-
-            IntPtr hInfoSet = HidDevicePInvoke.SetupDiGetClassDevs(
-                ref hidGuid,
-                null,
-                IntPtr.Zero,
-                HidDevicePInvoke.DIGCF_PRESENT | HidDevicePInvoke.DIGCF_DEVICEINTERFACE);
-
-            if (hInfoSet == IntPtr.Zero || hInfoSet.ToInt64() == -1)
-                return false;
-
-            try
-            {
-                var ifaceData = new SP_DEVICE_INTERFACE_DATA();
-                uint index = 0;
-
-                while (HidDevicePInvoke.SetupDiEnumDeviceInterfaces(
-                           hInfoSet,
-                           IntPtr.Zero,
-                           ref hidGuid,
-                           index,
-                           ref ifaceData))
-                {
-                    string? path = GetDevicePath(hInfoSet, ref ifaceData);
-
-                    if (!string.IsNullOrEmpty(path) &&
-                        path.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        _devicePath = path;
-                        success = true;
-                        break;
-                    }
-
-                    index++;
-                }
-            }
-            finally
-            {
-                HidDevicePInvoke.SetupDiDestroyDeviceInfoList(hInfoSet);
-            }
-
-            return success;
-        }
-
-        private static string? GetDevicePath(IntPtr hInfoSet, ref SP_DEVICE_INTERFACE_DATA ifaceData)
-        {
-            // 先問需要多少 buffer
-            int requiredSize;
-            var dummyDetail = new SP_DEVICE_INTERFACE_DETAIL_DATA
-            {
-                cbSize = SP_DEVICE_INTERFACE_DETAIL_DATA.CalcCbSize()
-            };
-
-            if (!HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(
-                    hInfoSet,
-                    ref ifaceData,
-                    ref dummyDetail,
-                    0,
-                    out requiredSize,
-                    IntPtr.Zero))
-            {
-                // 這裡預期會失敗，僅是拿 requiredSize
-            }
-
-            var detail = new SP_DEVICE_INTERFACE_DETAIL_DATA
-            {
-                cbSize = SP_DEVICE_INTERFACE_DETAIL_DATA.CalcCbSize()
-            };
-
-            if (!HidDevicePInvoke.SetupDiGetDeviceInterfaceDetail(
-                    hInfoSet,
-                    ref ifaceData,
-                    ref detail,
-                    Marshal.SizeOf(detail),
-                    out requiredSize,
-                    IntPtr.Zero))
-            {
-                return null;
-            }
-
-            return detail.DevicePath;
+            _devicePath = UsbInfoManager.FindDevice(_vendorId, _productId);
+            return !string.IsNullOrEmpty(_devicePath);
         }
 
         /// <summary>

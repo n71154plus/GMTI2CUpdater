@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Interop;
-using GMTI2CUpdater.Service;
+using System.Threading;
+using GMTI2CUpdater.I2CAdapter.Hardware;
 
 namespace GMTI2CUpdater
 {
@@ -10,7 +11,7 @@ namespace GMTI2CUpdater
     /// </summary>
     public partial class MainWindow : Window
     {
-        private UsbDeviceNotifier? _usbNotifier;
+        private UsbInfoManager.UsbDeviceNotificationRegistration? _usbNotifier;
         /// <summary>
         /// 初始化主視窗並套用 XAML 定義的 UI 元件。
         /// </summary>
@@ -72,7 +73,7 @@ namespace GMTI2CUpdater
 
             var source = (HwndSource)PresentationSource.FromVisual(this)!;
 
-            _usbNotifier = new UsbDeviceNotifier(source.Handle);
+            _usbNotifier = UsbInfoManager.RegisterUsbDeviceNotifications(source.Handle);
             source.AddHook(_usbNotifier.WndProc);
 
             _usbNotifier.UsbAttached += (s, path) =>
