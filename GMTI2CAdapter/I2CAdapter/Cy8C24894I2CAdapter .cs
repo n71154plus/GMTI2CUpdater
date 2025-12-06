@@ -17,6 +17,7 @@ namespace GMTI2CUpdater.I2CAdapter
     {
         private const int ReportLength = 65;
         private const int MaxI2CChunk = 32;
+        private const int HidRetryCount = 3;
 
         private const byte I2cWriteNotLast = 0x02;
         private const byte I2cWriteLast = 0x0A;
@@ -76,8 +77,7 @@ namespace GMTI2CUpdater.I2CAdapter
             while (_input[1] != 0x05)
             {
                 Thread.Sleep(100);
-                _hid.Write(_output, ReportLength, out _);
-                _ = _hid.Read(_input, ReportLength, out _);
+                _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
             }
 
             // 設定 I2C 頻率
@@ -85,13 +85,11 @@ namespace GMTI2CUpdater.I2CAdapter
             _output[0] = 0;
             _output[1] = (byte)_frequency;
             Array.Clear(_input, 0, _output.Length);
-            if (!_hid.Write(_output, ReportLength, out _))
+            if (!_hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount))
             {
-                _ = _hid.Read(_input, ReportLength, out _);
                 _hid.Close();
                 throw new Exception("CY8C24894 設定頻率失敗(Write)。");
             }
-            _ = _hid.Read(_input, ReportLength, out _);
 
             _initialized = true;
         }
@@ -185,8 +183,7 @@ namespace GMTI2CUpdater.I2CAdapter
                         _output[num++] = writeDataArray[j];
                     }
 
-                    _hid.Write(_output, ReportLength, out _);
-                    _hid.Read(_input, ReportLength, out _);
+                    _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
                     if (_input[1] == 0)
                     {
@@ -205,8 +202,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     _output[num++] = (byte)(devAddress >> 1);
                     _output[num++] = regAddress;
 
-                    _hid.Write(_output, ReportLength, out _);
-                    _hid.Read(_input, ReportLength, out _);
+                    _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
                     if (_input[1] == 0)
                     {
                         num = 0;
@@ -214,8 +210,7 @@ namespace GMTI2CUpdater.I2CAdapter
                         Array.Clear(_input, 0, _input.Length);
                         _output[num++] = 0;
                         _output[num++] = 0x08;
-                        _hid.Write(_output, ReportLength, out _);
-                        _hid.Read(_input, ReportLength, out _);
+                        _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
                         throw new Exception("找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                     }
 
@@ -236,8 +231,7 @@ namespace GMTI2CUpdater.I2CAdapter
                             _output[num++] = writeDataArray[MaxI2CChunk * chunk + m];
                         }
 
-                        _hid.Write(_output, ReportLength, out _);
-                        _hid.Read(_input, ReportLength, out _);
+                        _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
                     }
 
                     if (remain != 0)
@@ -254,8 +248,7 @@ namespace GMTI2CUpdater.I2CAdapter
                             _output[num++] = writeDataArray[writeDataArray.Length - remain + n];
                         }
 
-                        _hid.Write(_output, ReportLength, out _);
-                        _hid.Read(_input, ReportLength, out _);
+                        _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
                     }
                 }
             }
@@ -288,8 +281,7 @@ namespace GMTI2CUpdater.I2CAdapter
                 _output[num++] = (byte)(devAddress >> 1);
                 _output[num++] = regAddress;
 
-                _hid.Write(_output, ReportLength, out _);
-                _hid.Read(_input, ReportLength, out _);
+                _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
                 if (_input[1] == 0)
                 {
@@ -298,8 +290,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     Array.Clear(_input, 0, _input.Length);
                     _output[num++] = 0;
                     _output[num++] = I2CWriteStop;
-                    _hid.Write(_output, ReportLength, out _);
-                    _hid.Read(_input, ReportLength, out _);
+                    _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
                     _hid.Close();
                     throw new Exception("送Device Address找不到此IC的Device Address，請檢查I2C中SDA/SCL的連線");
                 }
@@ -314,8 +305,7 @@ namespace GMTI2CUpdater.I2CAdapter
                     _output[num++] = (byte)readDataArray.Length;
                     _output[num++] = (byte)(devAddress >> 1);
 
-                    _hid.Write(_output, ReportLength, out _);
-                    _hid.Read(_input, ReportLength, out _);
+                    _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
                     if (_input[1] == 0)
                     {
@@ -352,8 +342,7 @@ namespace GMTI2CUpdater.I2CAdapter
                             _output[num++] = MaxI2CChunk;
                         }
 
-                        _hid.Write(_output, ReportLength, out _);
-                        _hid.Read(_input, ReportLength, out _);
+                        _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
                         for (int l = 0; l < MaxI2CChunk; l++)
                         {
@@ -370,8 +359,7 @@ namespace GMTI2CUpdater.I2CAdapter
                         _output[num++] = I2CReadeStop;
                         _output[num++] = (byte)remain;
 
-                        _hid.Write(_output, ReportLength, out _);
-                        _hid.Read(_input, ReportLength, out _);
+                        _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
                         for (int m = 0; m < remain; m++)
                         {
@@ -401,8 +389,7 @@ namespace GMTI2CUpdater.I2CAdapter
             _output[num++] = (byte)(devAddress >> 1);
             _output[num++] = writeData;
 
-            _hid.Write(_output, ReportLength, out _);
-            _hid.Read(_input, ReportLength, out _);
+            _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
             _hid.Close();
         }
 
@@ -419,8 +406,7 @@ namespace GMTI2CUpdater.I2CAdapter
             _output[num++] = 1;
             _output[num++] = (byte)(devAddress >> 1);
 
-            _hid.Write(_output, ReportLength, out _);
-            _hid.Read(_input, ReportLength, out _);
+            _hid.Transceive(_output, ReportLength, _input, ReportLength, out _, HidRetryCount);
 
             if (_input[1] == 0)
             {

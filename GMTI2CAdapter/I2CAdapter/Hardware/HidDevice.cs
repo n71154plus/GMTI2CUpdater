@@ -96,7 +96,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         /// <summary>
         /// 寫入一整個 Report (或指定長度)，使用 Overlapped I/O。
         /// </summary>
-        public bool Write(byte[] buffer, int length, out int bytesWritten)
+        public bool Write(byte[] buffer, int length, out int bytesWritten, int retryCount = 1)
         {
             bytesWritten = 0;
 
@@ -115,7 +115,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return false;
             }
 
-            const int maxAttempts = 3;
+            int maxAttempts = Math.Max(1, retryCount);
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
@@ -151,7 +151,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
         /// <summary>
         /// 讀取一整個 Report (或指定長度)，使用 Overlapped I/O。
         /// </summary>
-        public bool Read(byte[] buffer, int length, out int bytesRead)
+        public bool Read(byte[] buffer, int length, out int bytesRead, int retryCount = 1)
         {
             bytesRead = 0;
 
@@ -170,7 +170,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return false;
             }
 
-            const int maxAttempts = 3;
+            int maxAttempts = Math.Max(1, retryCount);
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
@@ -202,6 +202,36 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 return false;
             }
 
+            return false;
+        }
+
+        /// <summary>
+        /// 進行一次寫入後立即讀取的往返操作，兩個步驟都成功才回傳 true。
+        /// </summary>
+        public bool Transceive(byte[] writeBuffer, int writeLength,
+                               byte[] readBuffer, int readLength,
+                               out int bytesRead, int retryCount = 1)
+        {
+            bytesRead = 0;
+            int maxAttempts = Math.Max(1, retryCount);
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                if (!Write(writeBuffer, writeLength, out _, retryCount: 1))
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
+                if (Read(readBuffer, readLength, out bytesRead, retryCount: 1))
+                {
+                    return true;
+                }
+
+                Thread.Sleep(50);
+            }
+
+            bytesRead = 0;
             return false;
         }
 
