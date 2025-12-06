@@ -19,12 +19,6 @@ namespace GMTI2CUpdater.I2CAdapter
         public const uint OPEN_EXISTING = 3;
         public const uint FILE_FLAG_OVERLAPPED = 0x40000000;
 
-        public const uint DIGCF_DEFAULT = 0x00000001;
-        public const uint DIGCF_PRESENT = 0x00000002;
-        public const uint DIGCF_ALLCLASSES = 0x00000004;
-        public const uint DIGCF_PROFILE = 0x00000008;
-        public const uint DIGCF_DEVICEINTERFACE = 0x00000010;
-
         #endregion
 
         #region Kernel32
@@ -79,56 +73,6 @@ namespace GMTI2CUpdater.I2CAdapter
 
         [DllImport("kernel32.dll", SetLastError = true)]
         internal static extern bool CancelIo(CySafeFileHandle hFile);
-
-        #endregion
-
-        #region SetupAPI
-
-        [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        internal static extern IntPtr SetupDiGetClassDevs(
-            ref Guid ClassGuid,
-            string? Enumerator,
-            IntPtr hwndParent,
-            uint Flags);
-
-        [DllImport("setupapi.dll", SetLastError = true)]
-        internal static extern bool SetupDiEnumDeviceInterfaces(
-            IntPtr DeviceInfoSet,
-            IntPtr DeviceInfoData,
-            ref Guid InterfaceClassGuid,
-            uint MemberIndex,
-            ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
-
-        [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        internal static extern bool SetupDiGetDeviceInterfaceDetail(
-            IntPtr DeviceInfoSet,
-            ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData,
-            ref SP_DEVICE_INTERFACE_DETAIL_DATA DeviceInterfaceDetailData,
-            int DeviceInterfaceDetailDataSize,
-            out int RequiredSize,
-            IntPtr DeviceInfoData);
-
-        [DllImport("setupapi.dll", SetLastError = true)]
-        internal static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
-
-        #endregion
-
-        #region HID.DLL
-
-        [DllImport("hid.dll", SetLastError = true)]
-        internal static extern bool HidD_GetFeature(
-            CySafeFileHandle hDevice,
-            [In, Out] byte[] lpFeatureData,
-            int bufLen);
-
-        [DllImport("hid.dll", SetLastError = true)]
-        internal static extern bool HidD_SetFeature(
-            CySafeFileHandle hDevice,
-            [In] byte[] lpFeatureData,
-            int bufLen);
-
-        [DllImport("hid.dll", SetLastError = true)]
-        internal static extern void HidD_GetHidGuid(ref Guid HidGuid);
 
         #endregion
 
@@ -194,47 +138,6 @@ namespace GMTI2CUpdater.I2CAdapter
         {
             return HidDevicePInvoke.CloseHandle(handle);
         }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct SP_DEVICE_INTERFACE_DATA
-    {
-        public int cbSize;
-        public Guid InterfaceClassGuid;
-        public uint Flags;
-        public IntPtr Reserved;
-
-        public SP_DEVICE_INTERFACE_DATA()
-        {
-            cbSize = Marshal.SizeOf(typeof(SP_DEVICE_INTERFACE_DATA));
-            InterfaceClassGuid = Guid.Empty;
-            Flags = 0;
-            Reserved = IntPtr.Zero;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-    internal struct SP_DEVICE_INTERFACE_DETAIL_DATA
-    {
-        public int cbSize;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string DevicePath;
-
-        public static int CalcCbSize()
-        {
-            // 官方建議：32-bit = 4 + 2, 64-bit = 8
-            return IntPtr.Size == 8 ? 8 : 4 + Marshal.SystemDefaultCharSize;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct SP_DEVINFO_DATA
-    {
-        public int cbSize;
-        public Guid ClassGuid;
-        public uint DevInst;
-        public IntPtr Reserved;
     }
 
     [StructLayout(LayoutKind.Sequential)]
