@@ -314,11 +314,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             // Buf 最多 16 bytes，其中 1 byte 是 index → 一次最多寫 15 bytes 資料
             const int ChunkSize = MaxI2cWriteChunk;
 
-            int offset = 0;
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
-                int remaining = data.Length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
                 int totalLen = 1 + currentLen; // index + data
                 byte idx = (byte)(index + offset);
 
@@ -335,11 +332,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 int status = _nvDisp_DpAuxChannelControl(display.DisplayHandle, ref p, size);
 
                 HandleAuxStatus(status, ref p, "NvAPI_Disp_DpAuxChannelControl(I2C Write ByteIndex)");
-
-
-
-                offset += currentLen;
-            }
+            });
         }
 
         // 16-bit index，從 index 起連續寫入 data（index 為大端）
@@ -360,11 +353,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
             byte hi = (byte)(index >> 8);
             byte lo = (byte)(index & 0xFF);
 
-            int offset = 0;
-            while (offset < data.Length)
+            I2cChunkHelper.WriteChunks(data.Length, ChunkSize, (offset, currentLen) =>
             {
-                int remaining = data.Length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
                 int totalLen = 2 + currentLen; // 2 bytes index + data
 
                 var p = CreateAuxParams();
@@ -381,11 +371,7 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
                 int status = _nvDisp_DpAuxChannelControl(display.DisplayHandle, ref p, size);
 
                 HandleAuxStatus(status, ref p, "NvAPI_Disp_DpAuxChannelControl(I2C Write UInt16Index)");
-
-
-
-                offset += currentLen;
-            }
+            });
         }
 
         // 無 index，讀取單一 byte
@@ -444,14 +430,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 再分段讀取資料
             const int ChunkSize = MaxI2cReadChunk;
-            int offset = 0;
-
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
             {
-                int remaining = length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-                bool isLast = offset + currentLen >= length;
-
                 var p = CreateAuxParams();
                 p.OutputId = display.MonitorUid;
                 p.Op = isLast ? DpAuxOpReadI2CLast : DpAuxOpReadI2CNotLast;
@@ -463,11 +443,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 HandleAuxStatus(status, ref p, "NvAPI_Disp_DpAuxChannelControl(I2C Read ByteIndex)");
 
-
-
-                Array.Copy(p.Buf, 0, result, offset, currentLen);
-                offset += currentLen;
-            }
+                return p.Buf;
+            }, result);
 
             return result;
         }
@@ -509,14 +486,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
             // 再分段讀取資料
             const int ChunkSize = MaxI2cReadChunk;
-            int offset = 0;
-
-            while (offset < length)
+            I2cChunkHelper.ReadChunks(length, ChunkSize, (offset, currentLen, isLast) =>
             {
-                int remaining = length - offset;
-                int currentLen = Math.Min(ChunkSize, remaining);
-                bool isLast = offset + currentLen >= length;
-
                 var p = CreateAuxParams();
                 p.OutputId = display.MonitorUid;
                 p.Op = isLast ? DpAuxOpReadI2CLast : DpAuxOpReadI2CNotLast;
@@ -528,11 +499,8 @@ namespace GMTI2CUpdater.I2CAdapter.Hardware
 
                 HandleAuxStatus(status, ref p, "NvAPI_Disp_DpAuxChannelControl(I2C Read UInt16Index)");
 
-
-
-                Array.Copy(p.Buf, 0, result, offset, currentLen);
-                offset += currentLen;
-            }
+                return p.Buf;
+            }, result);
 
             return result;
         }
