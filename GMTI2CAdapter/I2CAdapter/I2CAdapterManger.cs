@@ -1,4 +1,8 @@
-﻿namespace GMTI2CUpdater.I2CAdapter
+using System.Collections.Generic;
+using System.Linq;
+using GMTI2CUpdater.I2CAdapter.Hardware;
+
+namespace GMTI2CUpdater.I2CAdapter
 {
     /// <summary>
     /// 集中處理各家顯示卡 I2C 介面的列舉邏輯。
@@ -13,8 +17,8 @@
             list.AddRange(usbi2clist);
             list.AddRange(displaylist);
             return list;
-
         }
+
         public static List<I2CAdapterBase> GetAvaiableUsbI2CAdapter()
         {
             var list = new List<I2CAdapterBase>();
@@ -32,18 +36,15 @@
                         0x04B4,
                         0xF232
                     ));
-
                 }
-
             }
             catch
             {
                 //ignore Usb I2C Adapter:CY8C24894 Error
             }
+
             return list;
         }
-
-
 
         /// <summary>
         /// 嘗試從 NVIDIA 與 Intel API 取得可用的顯示介面並組成清單。
@@ -75,6 +76,7 @@
             {
                 // ignore IGCL error
             }
+
             try
             {
                 using var igfx = new Hardware.IntelIGFXApi();
