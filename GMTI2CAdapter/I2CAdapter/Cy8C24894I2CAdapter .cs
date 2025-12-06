@@ -1,4 +1,5 @@
 using System;
+using GMTI2CUpdater.I2CAdapter.Hardware;
 
 namespace GMTI2CUpdater.I2CAdapter
 {
